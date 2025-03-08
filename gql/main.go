@@ -26,6 +26,8 @@ type Field struct {
 	SubFields []Field
 	Alias     string
 	Arguments map[string]string
+	Type      string
+	Kind      string
 }
 
 func (f Field) String() string {
@@ -75,6 +77,12 @@ func (q Query) String() string {
 
 	queryStr := fmt.Sprintf("%s %s(%s) { \n %s \n}", q.Operation, q.Name, strings.Join(varDefs, ", "), strings.Join(fieldStrs, "\n "))
 	return queryStr
+}
+
+type SchemaType struct {
+	Name   string
+	Kind   string
+	Fields []Field
 }
 
 func Test() {
