@@ -42,7 +42,7 @@ type Field struct {
 	Arguments map[string]string
 	Type      string
 	Kind      string
-	Fragment  Fragment
+	Fragments []Fragment
 }
 
 func (f Field) String() string {
@@ -60,16 +60,20 @@ func (f Field) String() string {
 		fieldStr += "(" + strings.Join(args, ", ") + ")"
 	}
 
-	if len(f.SubFields) > 0 {
-		subFieldStrs := []string{}
-		for _, subField := range f.SubFields {
-			subFieldStrs = append(subFieldStrs, subField.String())
-		}
-		fieldStr += " { " + strings.Join(subFieldStrs, " ") + " }"
-	}
+	if len(f.SubFields)+len(f.Fragments) > 0 {
+		fieldStr += " { "
+		elementStrings := []string{}
 
-	if f.Fragment.Name != "" {
-		fieldStr += " { ... " + f.Fragment.Name + " }"
+		for _, frag := range f.Fragments {
+			elementStrings = append(elementStrings, "..."+frag.Name)
+		}
+
+		for _, subField := range f.SubFields {
+			elementStrings = append(elementStrings, subField.String())
+		}
+
+		fieldStr += strings.Join(elementStrings, " ")
+		fieldStr += " }"
 	}
 
 	return fieldStr
@@ -99,7 +103,7 @@ func (q Query) String() string {
 		args = "(" + strings.Join(varDefs, ", ") + ")"
 	}
 
-	queryStr := fmt.Sprintf("%s %s%s { \n %s \n}", q.Operation, q.Name, args, strings.Join(fieldStrs, "\n "))
+	queryStr := fmt.Sprintf("%s %s%s { %s }", q.Operation, q.Name, args, strings.Join(fieldStrs, " "))
 	return queryStr
 }
 

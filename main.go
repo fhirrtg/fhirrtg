@@ -34,19 +34,67 @@ func GenerateFragment(typeName string) gql.Fragment {
 	return fragment
 }
 
-func FullResourceRequest(fragment gql.Fragment) gql.Query {
-	fmt.Printf("Resource Request: %s\n", fragment.Type)
+func findField(fields []gql.Field, fieldName string) gql.Field {
+	for _, field := range fields {
+		if field.Name == fieldName {
+			return field
+		}
+	}
 
+	return gql.Field{}
+}
+
+type IncludeParam struct {
+	ResourceName  string
+	FieldName     string
+	TargetType    string
+	PossibleTypes []string
+}
+
+func parseIncludeParam(includeParam string) (IncludeParam, error) {
+	parts := strings.Split(includeParam, ":")
+
+	if len(parts) != 2 && len(parts) != 3 {
+		return IncludeParam{}, fmt.Errorf("invalid _include parameter: %s, %v", includeParam, parts)
+	}
+
+	include := IncludeParam{
+		ResourceName: parts[0],
+		FieldName:    parts[1],
+	}
+	if len(parts) == 3 {
+		include.TargetType = parts[2]
+	}
+	return include, nil
+}
+
+func FullResourceRequest(resourceType string, include IncludeParam, fragments map[string]gql.Fragment) gql.Query {
 	// Get the schema for the resource
-	// schema := schemaDict[fragment.Type]
+	// schema := schemaDict[resourceType]
+
+	includeFrags := []gql.Fragment{}
+	for _, possibleType := range include.PossibleTypes {
+		includeFrags = append(includeFrags, fragments[possibleType])
+	}
 
 	query := gql.Query{
 		Operation: "query",
-		Name:      "Get" + fragment.Type,
+		Name:      "Get" + resourceType,
 		Fields: []gql.Field{
 			{
-				Name:     fragment.Type,
-				Fragment: fragment,
+				Name:      resourceType,
+				Fragments: []gql.Fragment{fragments[resourceType]},
+				SubFields: []gql.Field{
+					{
+						Name: include.FieldName,
+						SubFields: []gql.Field{
+							{
+								Name:      "resource",
+								Fragments: includeFrags,
+							},
+						},
+					},
+				},
 			},
 		},
 	}
@@ -55,13 +103,44 @@ func FullResourceRequest(fragment gql.Fragment) gql.Query {
 }
 
 func fhirSearch(w http.ResponseWriter, queryString url.Values, resourceType string) {
+	includeParam := queryString.Get("_include")
+	var include IncludeParam
+	var err error
 	fragment := GenerateFragment(resourceType)
-	query := FullResourceRequest(fragment)
+	fragments := map[string]gql.Fragment{resourceType: fragment}
 
-	gqlStr := fragment.String() + "\n" + query.String()
+	if includeParam != "" {
+		include, err = parseIncludeParam(includeParam)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		inclResource := schemaDict[include.ResourceName]
+		inclField := findField(inclResource.Fields, include.FieldName)
+
+		referenceType := schemaDict[inclField.Type]
+		refResourceType := findField(referenceType.Fields, "resource")
+		unionType := schemaDict[refResourceType.Type]
+
+		for _, possibleType := range unionType.PossibleTypes {
+			fragments[possibleType.Name] = GenerateFragment(possibleType.Name)
+			include.PossibleTypes = append(include.PossibleTypes, possibleType.Name)
+		}
+
+		fmt.Printf("Include Resource: %v\n", unionType.PossibleTypes)
+	}
+
+	gqlStr := ""
+	for _, fragment := range fragments {
+		gqlStr += fragment.String() + "\n"
+	}
+
+	query := FullResourceRequest(resourceType, include, fragments)
+	gqlStr += query.String()
 
 	// fmt.Println("GQL Query:")
-	// fmt.Println(gqlStr)
+	fmt.Println(gqlStr)
 
 	resp := GqlRequest(gqlStr)
 	w.Write(resp)
