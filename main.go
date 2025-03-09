@@ -7,6 +7,8 @@ import (
 	"net/url"
 	"os"
 	"strings"
+
+	"github.com/telus/fhirrtg/gql"
 )
 
 const (
@@ -20,17 +22,49 @@ var (
 	upstream string
 )
 
-func FhirSearch(w http.ResponseWriter, queryString url.Values, resourceType string, resourceId string) {
+func GenerateFragment(typeName string) gql.Fragment {
+	schema := schemaDict[typeName]
 
-	// Print the query string
-	fmt.Print("Query String:\n")
-
-	for key, values := range queryString {
-		for _, value := range values {
-			fmt.Fprintf(w, "%s: %s\n", key, value)
-			fmt.Printf("%s: %s\n", key, value)
-		}
+	fragment := gql.Fragment{
+		Name:   typeName + "Fragment",
+		Type:   typeName,
+		Fields: buildFieldTree(schema.Fields, 0),
 	}
+
+	return fragment
+}
+
+func FullResourceRequest(fragment gql.Fragment) gql.Query {
+	fmt.Printf("Resource Request: %s\n", fragment.Type)
+
+	// Get the schema for the resource
+	// schema := schemaDict[fragment.Type]
+
+	query := gql.Query{
+		Operation: "query",
+		Name:      "Get" + fragment.Type,
+		Fields: []gql.Field{
+			{
+				Name:     fragment.Type,
+				Fragment: fragment,
+			},
+		},
+	}
+
+	return query
+}
+
+func fhirSearch(w http.ResponseWriter, queryString url.Values, resourceType string) {
+	fragment := GenerateFragment(resourceType)
+	query := FullResourceRequest(fragment)
+
+	gqlStr := fragment.String() + "\n" + query.String()
+
+	// fmt.Println("GQL Query:")
+	// fmt.Println(gqlStr)
+
+	resp := GqlRequest(gqlStr)
+	w.Write(resp)
 }
 
 func parseQueryString(w http.ResponseWriter, req *http.Request) {
@@ -48,8 +82,7 @@ func parseQueryString(w http.ResponseWriter, req *http.Request) {
 			fmt.Println("No path components")
 		case 2:
 			/// Resource Type Search
-			fmt.Println("Resource Type Search")
-			fmt.Println("  Type: ", pathComponents[1])
+			fhirSearch(w, req.URL.Query(), pathComponents[1])
 		case 3:
 			// Resource Type Read
 			fmt.Println("Resource Type Read")
@@ -95,9 +128,13 @@ func main() {
 
 	introspect()
 
-	fmt.Println("-----------\n Reqeust:")
-
-	FullResourceRequest("Patient")
+	// fmt.Println("-----------\n Reqeust:")
+	// patientFragment := GenerateFragment("Patient")
+	// encounterFragment := GenerateFragment("Encounter")
+	// q := FullResourceRequest(encounterFragment)
+	// fmt.Print(patientFragment.String())
+	// fmt.Print(encounterFragment.String())
+	// fmt.Println(q.String())
 
 	http.HandleFunc("/", parseQueryString)
 	http.ListenAndServe(fmt.Sprintf(":%d", PORT), nil)

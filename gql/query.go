@@ -10,6 +10,20 @@ type Node interface {
 	String() string
 }
 
+type Fragment struct {
+	Name   string
+	Type   string
+	Fields []Field
+}
+
+func (f Fragment) String() string {
+	var fieldStrs []string
+	for _, field := range f.Fields {
+		fieldStrs = append(fieldStrs, field.String())
+	}
+	return fmt.Sprintf("fragment %s on %s { %s }", f.Name, f.Type, strings.Join(fieldStrs, " "))
+}
+
 // Variable represents a GraphQL variable (e.g., $id: ID!)
 type Variable struct {
 	Name string
@@ -28,6 +42,7 @@ type Field struct {
 	Arguments map[string]string
 	Type      string
 	Kind      string
+	Fragment  Fragment
 }
 
 func (f Field) String() string {
@@ -53,6 +68,10 @@ func (f Field) String() string {
 		fieldStr += " { " + strings.Join(subFieldStrs, " ") + " }"
 	}
 
+	if f.Fragment.Name != "" {
+		fieldStr += " { ... " + f.Fragment.Name + " }"
+	}
+
 	return fieldStr
 }
 
@@ -75,14 +94,25 @@ func (q Query) String() string {
 		fieldStrs = append(fieldStrs, f.String())
 	}
 
-	queryStr := fmt.Sprintf("%s %s(%s) { \n %s \n}", q.Operation, q.Name, strings.Join(varDefs, ", "), strings.Join(fieldStrs, "\n "))
+	args := ""
+	if len(varDefs) > 0 {
+		args = "(" + strings.Join(varDefs, ", ") + ")"
+	}
+
+	queryStr := fmt.Sprintf("%s %s%s { \n %s \n}", q.Operation, q.Name, args, strings.Join(fieldStrs, "\n "))
 	return queryStr
 }
 
+type PossibleType struct {
+	Name string
+	Kind string
+}
+
 type SchemaType struct {
-	Name   string
-	Kind   string
-	Fields []Field
+	Name          string
+	Kind          string
+	PossibleTypes []PossibleType
+	Fields        []Field
 }
 
 func Test() {

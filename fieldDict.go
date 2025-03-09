@@ -1,11 +1,8 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"strings"
 
 	"github.com/telus/fhirrtg/gql"
@@ -28,33 +25,43 @@ type IntrospectionData struct {
 }
 
 type IntrospectionSchema struct {
-	Types []GraphQLType `json:"types"`
+	Types []IntrospectionType `json:"types"`
 }
 
-type GraphQLType struct {
-	Name   string         `json:"name"`
-	Kind   string         `json:"kind"`
-	Fields []GraphQLField `json:"fields"`
+type IntrospectionPossibleType struct {
+	Name string `json:"name"`
+	Kind string `json:"kind"`
 }
 
-type GraphQLField struct {
-	Name string         `json:"name"`
-	Type GraphQLTypeDef `json:"type"`
+type IntrospectionType struct {
+	Name          string                      `json:"name"`
+	Kind          string                      `json:"kind"`
+	PossibleTypes []IntrospectionPossibleType `json:"possibleTypes"`
+	Fields        []IntrospectionField        `json:"fields"`
 }
 
-type GraphQLTypeDef struct {
-	Name   string          `json:"name"`
-	Kind   string          `json:"kind"`
-	OfType *GraphQLTypeDef `json:"ofType,omitempty"`
+type IntrospectionField struct {
+	Name string                    `json:"name"`
+	Type IntrospectionFieldTypeDef `json:"type"`
+}
+
+type IntrospectionFieldTypeDef struct {
+	Name   string                     `json:"name"`
+	Kind   string                     `json:"kind"`
+	OfType *IntrospectionFieldTypeDef `json:"ofType,omitempty"`
 }
 
 func introspect() {
-	query := /* GraphQL */ `{
-		"query": "{
+	query := /* GraphQL */ `
+		{
 			__schema {
 				types {
 					name
 					kind
+					possibleTypes {
+						name
+						kind
+					}
 					fields {
 						name
 						type {
@@ -76,43 +83,28 @@ func introspect() {
 					}
 				}
 			}
-		}"
-	}`
-	// resp, err := http.Post(upstream, GQL_ACCEPT_HEADER, bytes.NewBuffer([]byte(query)))
-	req, err := http.NewRequest("POST", upstream, bytes.NewBuffer([]byte(query)))
+		}
+	`
 
-	if err != nil {
-		panic(err)
-	}
-
-	// Set Headers
-	req.Header.Set("Content-Type", "application/json")
-
-	// Send request
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		fmt.Println("Error sending request:", err)
-		panic(err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		panic(err)
-	}
-
+	body := GqlRequest(query)
 	fd := buildFieldDict(body)
 
 	// Print the field dictionary
 	fmt.Println("Field Dictionary:")
 	for key, value := range fd {
-		fmt.Printf("%s\n", key)
+		fmt.Printf("%s [%s]\n", key, value.Kind)
+		if value.PossibleTypes != nil {
+			names := []string{}
+			for _, pt := range value.PossibleTypes {
+				names = append(names, pt.Name)
+			}
+			fmt.Printf("    ((%s))\n", strings.Join(names, ", "))
+		}
 		for _, field := range value.Fields {
-			fmt.Printf("   %s (%s)\n", field.Name, field.Type)
+			fmt.Printf("   %s (%s|%s)\n", field.Name, field.Type, field.Kind)
 		}
 	}
-
+	fmt.Println("-------------------")
 }
 
 func buildFieldDict(response []byte) map[string]gql.SchemaType {
@@ -144,17 +136,17 @@ func buildFieldDict(response []byte) map[string]gql.SchemaType {
 			}
 		}
 		schemaDict[typ.Name] = gql.SchemaType{
-			Name:   typ.Name,
-			Kind:   typ.Kind,
-			Fields: fields,
+			Name:          typ.Name,
+			Kind:          typ.Kind,
+			PossibleTypes: convertPossibleTypes(typ.PossibleTypes),
+			Fields:        fields,
 		}
-		fmt.Println()
 	}
 
 	return schemaDict
 }
 
-func getFieldType(typeDef GraphQLTypeDef) (string, string) {
+func getFieldType(typeDef IntrospectionFieldTypeDef) (string, string) {
 	if typeDef.Name != "" {
 		return typeDef.Name, typeDef.Kind
 	}
@@ -167,7 +159,18 @@ func getFieldType(typeDef GraphQLTypeDef) (string, string) {
 	return getFieldType(*typeDef.OfType)
 }
 
-func recurseFields(fields []gql.Field, level int) []gql.Field {
+func convertPossibleTypes(possibleTypes []IntrospectionPossibleType) []gql.PossibleType {
+	var gqlPossibleTypes []gql.PossibleType
+	for _, pt := range possibleTypes {
+		gqlPossibleTypes = append(gqlPossibleTypes, gql.PossibleType{
+			Name: pt.Name,
+			Kind: pt.Kind,
+		})
+	}
+	return gqlPossibleTypes
+}
+
+func buildFieldTree(fields []gql.Field, level int) []gql.Field {
 	outFields := []gql.Field{}
 	for _, field := range fields {
 		outField := gql.Field{
@@ -177,33 +180,12 @@ func recurseFields(fields []gql.Field, level int) []gql.Field {
 		}
 		if field.Kind == "OBJECT" && level < GQL_DEPTH_LIMIT {
 			schema := schemaDict[field.Type]
-			fmt.Println("Field:", field.Type, schema.Name, schema.Kind)
-			outField.SubFields = recurseFields(schema.Fields, level+1)
+			outField.SubFields = buildFieldTree(schema.Fields, level+1)
 			outFields = append(outFields, outField)
 		}
-		if field.Kind != "OBJECT" {
+		if field.Kind == "SCALAR" || field.Kind == "ENUM" || field.Kind == "LIST" {
 			outFields = append(outFields, outField)
 		}
 	}
 	return outFields
-}
-
-func FullResourceRequest(resourceName string) {
-	fmt.Printf("Resource Request: %s\n", resourceName)
-
-	// Get the schema for the resource
-	schema := schemaDict[resourceName]
-
-	query := gql.Query{
-		Operation: "query",
-		Name:      "Get" + resourceName,
-		Fields: []gql.Field{
-			{
-				Name:      resourceName,
-				SubFields: recurseFields(schema.Fields, 0),
-			},
-		},
-	}
-
-	fmt.Println(query.String())
 }
