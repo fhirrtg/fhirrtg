@@ -70,9 +70,17 @@ func FullResourceRequest(
 	}
 
 	fields := []gql.Field{}
+
+	var primaryArgs gql.Arguments
+	if len(searchParams) > 0 {
+		primaryArgs = gql.Arguments{"search": gql.ArgumentValue{SubArguments: searchParams}}
+	} else {
+		primaryArgs = nil
+	}
+
 	primaryField := gql.Field{
 		Name:      resourceType,
-		Arguments: gql.Arguments{"search": gql.ArgumentValue{SubArguments: searchParams}},
+		Arguments: primaryArgs,
 		Fragments: []gql.Fragment{fragments[resourceType]},
 		SubFields: subFields,
 	}
