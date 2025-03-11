@@ -44,45 +44,14 @@ func findField(fields []gql.Field, fieldName string) gql.Field {
 	return gql.Field{}
 }
 
-type IncludeParam struct {
-	ResourceName  string
-	FieldName     string
-	TargetType    string
-	PossibleTypes []string
-}
+func FullResourceRequest(
+	resourceType string,
+	searchParams gql.Arguments,
+	includes []IncludeParam,
+	revincludes []IncludeParam,
+	fragments map[string]gql.Fragment,
+) gql.Query {
 
-func parseIncludeParam(includeParam string) (IncludeParam, error) {
-	parts := strings.Split(includeParam, ":")
-
-	if len(parts) != 2 && len(parts) != 3 {
-		return IncludeParam{}, fmt.Errorf("invalid _include parameter: %s, %v", includeParam, parts)
-	}
-
-	include := IncludeParam{
-		ResourceName: parts[0],
-		FieldName:    parts[1],
-	}
-	if len(parts) == 3 {
-		include.TargetType = parts[2]
-	}
-
-	inclResource := schemaDict[include.ResourceName]
-	inclField := findField(inclResource.Fields, include.FieldName)
-
-	referenceType := schemaDict[inclField.Type]
-	refResourceType := findField(referenceType.Fields, "resource")
-	unionType := schemaDict[refResourceType.Type]
-
-	for _, possibleType := range unionType.PossibleTypes {
-		include.PossibleTypes = append(include.PossibleTypes, possibleType.Name)
-	}
-
-	fmt.Printf("Include Resource: %v\n", unionType.PossibleTypes)
-
-	return include, nil
-}
-
-func FullResourceRequest(resourceType string, includes []IncludeParam, fragments map[string]gql.Fragment) gql.Query {
 	subFields := []gql.Field{}
 	for _, include := range includes {
 		includeFrags := []gql.Fragment{}
@@ -100,28 +69,42 @@ func FullResourceRequest(resourceType string, includes []IncludeParam, fragments
 		})
 	}
 
+	fields := []gql.Field{}
+	primaryField := gql.Field{
+		Name:      resourceType,
+		Arguments: gql.Arguments{"search": gql.ArgumentValue{SubArguments: searchParams}},
+		Fragments: []gql.Fragment{fragments[resourceType]},
+		SubFields: subFields,
+	}
+
+	fields = append(fields, primaryField)
+
+	for _, revinclude := range revincludes {
+		revincludeFrag := fragments[revinclude.ResourceName]
+		revField := gql.Field{
+			Name:      revinclude.ResourceName,
+			Arguments: gql.Arguments{revinclude.FieldName: gql.ArgumentValue{SubArguments: searchParams}},
+			Fragments: []gql.Fragment{revincludeFrag},
+		}
+		fields = append(fields, revField)
+	}
+
 	query := gql.Query{
 		Operation: "query",
 		Name:      "Get" + resourceType,
-		Fields: []gql.Field{
-			{
-				Name:      resourceType,
-				Fragments: []gql.Fragment{fragments[resourceType]},
-				SubFields: subFields,
-			},
-		},
+		Fields:    fields,
 	}
 
 	return query
 }
 
 func fhirSearch(w http.ResponseWriter, queryString url.Values, resourceType string) {
-	includeParams := queryString["_include"]
-
-	var includes []IncludeParam
+	profile := queryString.Get("_profile")
 	fragment := GenerateFragment(resourceType)
 	fragments := map[string]gql.Fragment{resourceType: fragment}
 
+	var includes []IncludeParam
+	includeParams := queryString["_include"]
 	for _, includeParam := range includeParams {
 		include, err := parseIncludeParam(includeParam)
 		if err != nil {
@@ -136,23 +119,44 @@ func fhirSearch(w http.ResponseWriter, queryString url.Values, resourceType stri
 		includes = append(includes, include)
 	}
 
+	var revincludes []IncludeParam
+	revincludeParams := queryString["_revinclude"]
+	for _, revincludeParams := range revincludeParams {
+		revinclude, err := parseIncludeParam(revincludeParams)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		// Generate fragment for the revinclude type
+		fragments[revinclude.ResourceName] = GenerateFragment(revinclude.ResourceName)
+		revincludes = append(includes, revinclude)
+	}
+
+	var searchParams = make(gql.Arguments)
+	for key, value := range queryString {
+		if strings.HasPrefix(key, "_") {
+			continue
+		}
+		searchParams[key] = gql.ArgumentValue{Value: value[0]}
+	}
+
 	gqlStr := ""
 	for _, fragment := range fragments {
 		gqlStr += fragment.String() + "\n"
 	}
 
-	query := FullResourceRequest(resourceType, includes, fragments)
+	query := FullResourceRequest(resourceType, searchParams, includes, revincludes, fragments)
 	gqlStr += query.String()
 
 	// fmt.Println("GQL Query:")
 	fmt.Println(gqlStr)
 
-	resp := GqlRequest(gqlStr)
+	resp := GqlRequest(gqlStr, profile)
 	w.Write(resp)
 }
 
 func parseQueryString(w http.ResponseWriter, req *http.Request) {
-	// Determine if the request is a POST or GET
 	switch req.Method {
 	case http.MethodPost:
 		fmt.Println("Request Method: POST")

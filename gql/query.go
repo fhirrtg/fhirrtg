@@ -34,12 +34,29 @@ func (v Variable) String() string {
 	return fmt.Sprintf("$%s: %s", v.Name, v.Type)
 }
 
+type ArgumentValue struct {
+	Value        string
+	SubArguments map[string]ArgumentValue
+}
+type Arguments map[string]ArgumentValue
+
+func (a ArgumentValue) String() string {
+	if len(a.SubArguments) > 0 {
+		var subArgs []string
+		for key, value := range a.SubArguments {
+			subArgs = append(subArgs, fmt.Sprintf("%s: %s", key, value))
+		}
+		return fmt.Sprintf("{ %s }", strings.Join(subArgs, ", "))
+	}
+	return fmt.Sprintf("%q", a.Value)
+}
+
 // Field represents a GraphQL field (e.g., "id", "name")
 type Field struct {
 	Name      string
 	SubFields []Field
 	Alias     string
-	Arguments map[string]string
+	Arguments Arguments
 	Type      string
 	Kind      string
 	Fragments []Fragment
@@ -48,7 +65,7 @@ type Field struct {
 func (f Field) String() string {
 	var args []string
 	for key, value := range f.Arguments {
-		args = append(args, fmt.Sprintf("%s: %s", key, value))
+		args = append(args, fmt.Sprintf("%s: %s", key, value.String()))
 	}
 
 	fieldStr := f.Name
@@ -119,41 +136,41 @@ type SchemaType struct {
 	Fields        []Field
 }
 
-func Test() {
-	// Construct an AST representation of the query
-	query := Query{
-		Operation: "query",
-		Name:      "GetUser",
-		Variables: []Variable{
-			{Name: "id", Type: "ID!"},
-			{Name: "name", Type: "String!"},
-		},
-		Fields: []Field{
-			{
-				Name: "user",
-				Arguments: map[string]string{
-					"id": "$id",
-				},
-				SubFields: []Field{
-					{Name: "id"},
-					{Name: "name"},
-					{Name: "email"},
-				},
-			},
-			{
-				Name: "patient",
-				Arguments: map[string]string{
-					"id": "$id",
-				},
-				SubFields: []Field{
-					{Name: "id"},
-					{Name: "name"},
-					{Name: "mrn"},
-				},
-			},
-		},
-	}
+// func Test() {
+// 	// Construct an AST representation of the query
+// 	query := Query{
+// 		Operation: "query",
+// 		Name:      "GetUser",
+// 		Variables: []Variable{
+// 			{Name: "id", Type: "ID!"},
+// 			{Name: "name", Type: "String!"},
+// 		},
+// 		Fields: []Field{
+// 			{
+// 				Name: "user",
+// 				Arguments: map[string]string{
+// 					"id": "$id",
+// 				},
+// 				SubFields: []Field{
+// 					{Name: "id"},
+// 					{Name: "name"},
+// 					{Name: "email"},
+// 				},
+// 			},
+// 			{
+// 				Name: "patient",
+// 				Arguments: map[string]string{
+// 					"id": "$id",
+// 				},
+// 				SubFields: []Field{
+// 					{Name: "id"},
+// 					{Name: "name"},
+// 					{Name: "mrn"},
+// 				},
+// 			},
+// 		},
+// 	}
 
-	// Render query to a string
-	fmt.Println(query.String())
-}
+// 	// Render query to a string
+// 	fmt.Println(query.String())
+// }

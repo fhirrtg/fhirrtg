@@ -11,10 +11,12 @@ var (
 	client = &http.Client{}
 )
 
-func GqlRequest(gql string) []byte {
+func GqlRequest(gql string, profile string) []byte {
 	query := fmt.Sprintf(`{"query": %q}`, gql)
 
-	req, err := http.NewRequest("POST", upstream, bytes.NewBuffer([]byte(query)))
+	url := fmt.Sprintf("%s?_profile=%s", upstream, profile)
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte(query)))
 
 	if err != nil {
 		panic(err)

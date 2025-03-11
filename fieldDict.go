@@ -86,7 +86,7 @@ func introspect() {
 		}
 	`
 
-	body := GqlRequest(query)
+	body := GqlRequest(query, "")
 	fd := buildFieldDict(body)
 
 	// Print the field dictionary
