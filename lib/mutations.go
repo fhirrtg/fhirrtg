@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/telus/fhirrtg/gql"
+	"github.com/fhirrtg/fhirrtg/gql"
 )
 
 func generateCreateMutation(resourceType string, body []byte) string {

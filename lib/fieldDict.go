@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/telus/fhirrtg/gql"
+	"github.com/fhirrtg/fhirrtg/gql"
 )
 
 const (
@@ -90,21 +90,21 @@ func introspect() {
 	fd := buildFieldDict(body)
 
 	// Print the field dictionary
-	fmt.Println("Field Dictionary:")
+	log.Debug("Field Dictionary:")
 	for key, value := range fd {
-		fmt.Printf("%s [%s]\n", key, value.Kind)
+		log.Debug(fmt.Sprintf("%s [%s]", key, value.Kind))
 		if value.PossibleTypes != nil {
 			names := []string{}
 			for _, pt := range value.PossibleTypes {
 				names = append(names, pt.Name)
 			}
-			fmt.Printf("    ((%s))\n", strings.Join(names, ", "))
+			log.Debug(fmt.Sprintf("    ((%s))", strings.Join(names, ", ")))
 		}
 		for _, field := range value.Fields {
-			fmt.Printf("   %s (%s|%s)\n", field.Name, field.Type, field.Kind)
+			log.Debug(fmt.Sprintf("   %s (%s|%s)", field.Name, field.Type, field.Kind))
 		}
 	}
-	fmt.Println("-------------------")
+	log.Debug("-------------------")
 }
 
 func buildFieldDict(response []byte) map[string]gql.SchemaType {

@@ -39,7 +39,7 @@ func parseIncludeParam(includeParam string) (IncludeParam, error) {
 		include.PossibleTypes = append(include.PossibleTypes, possibleType.Name)
 	}
 
-	fmt.Printf("Include Resource: %v\n", unionType.PossibleTypes)
+	log.Debug(fmt.Sprintf("Include Resource: %v\n", unionType.PossibleTypes))
 
 	return include, nil
 }

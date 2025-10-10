@@ -4,12 +4,13 @@ import (
 	"crypto/tls"
 	"flag"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
 
-	"github.com/telus/fhirrtg/gql"
+	"github.com/fhirrtg/fhirrtg/gql"
 )
 
 const (
@@ -23,10 +24,28 @@ var (
 	GQL_ACCEPT_HEADER string
 	SKIP_TLS_VERIFY   bool
 	client            *http.Client
+	log               *slog.Logger
 )
 
 func init() {
-	portStr := getEnv("FHIRRTG_PORT", strconv.Itoa(DEFAULT_PORT))
+	var logLevel slog.Level
+	logLevelStr := getEnv("LOG_LEVEL", "info")
+	switch strings.ToLower(logLevelStr) {
+	case "debug":
+		logLevel = slog.LevelDebug
+	case "info":
+		logLevel = slog.LevelInfo
+	case "warn":
+		logLevel = slog.LevelWarn
+	case "error":
+		logLevel = slog.LevelError
+	default:
+		logLevel = slog.LevelInfo
+		fmt.Printf("Invalid log level: %s, using default: info\n", logLevelStr)
+	}
+	log = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel}))
+
+	portStr := getEnv("PORT", strconv.Itoa(DEFAULT_PORT))
 	port, err := strconv.Atoi(portStr)
 	if err != nil {
 		fmt.Printf("Invalid port number: %s, using default: %d\n", portStr, DEFAULT_PORT)
@@ -35,8 +54,8 @@ func init() {
 		PORT = port
 	}
 
-	GQL_ACCEPT_HEADER = getEnv("FHIRRTG_GQL_ACCEPT_HEADER", DEFAULT_GQL_ACCEPT_HEADER)
-	SKIP_TLS_VERIFY = getEnv("FHIRRTG_SKIP_TLS_VERIFY", "false") == "true"
+	GQL_ACCEPT_HEADER = getEnv("GQL_ACCEPT_HEADER", DEFAULT_GQL_ACCEPT_HEADER)
+	SKIP_TLS_VERIFY = getEnv("SKIP_TLS_VERIFY", "false") == "true"
 
 	client = &http.Client{
 		Transport: &http.Transport{
@@ -200,7 +219,7 @@ func fhirSearch(w http.ResponseWriter, req *http.Request, resourceType string) {
 	gqlStr += query.String()
 
 	// fmt.Println("GQL Query:")
-	fmt.Println(gqlStr)
+	log.Debug(gqlStr)
 
 	resp := GqlRequest(gqlStr, profile)
 	bundle := ProcessBundle(resp, req)
@@ -233,8 +252,8 @@ func fhirRead(w http.ResponseWriter, req *http.Request, resourceType string, id 
 	}
 	gqlStr += query.String()
 
-	fmt.Println("GQL Query:")
-	fmt.Println(gqlStr)
+	log.Debug("GQL Query:")
+	log.Debug(gqlStr)
 
 	resp := GqlRequest(gqlStr, profile)
 	resource := ProcessRead(resp, req)
@@ -242,6 +261,8 @@ func fhirRead(w http.ResponseWriter, req *http.Request, resourceType string, id 
 }
 
 func parseQueryString(w http.ResponseWriter, req *http.Request) {
+	log.Info("parsing request", "method", req.Method, "path", req.URL.Path, "query", req.URL.RawQuery, "remote_addr", req.RemoteAddr)
+
 	switch req.Method {
 	case http.MethodPost:
 		fmt.Println("Request Method: POST")
@@ -250,28 +271,27 @@ func parseQueryString(w http.ResponseWriter, req *http.Request) {
 		switch len(pathComponents) {
 		case 1:
 			// Server Root
-			fmt.Println("No path components")
+			log.Info("No path components")
 		case 2:
 			/// Create Resource
-			fmt.Println("Create Resource")
-			fmt.Println("  Type: ", pathComponents[1])
+			log.Info("Create Resource")
+			log.Info("Create Resource", "type", pathComponents[1])
 			FhirCreate(w, req, pathComponents[1])
 		case 3:
 			// Update Resource
 		default:
-			fmt.Println("Bad Request")
+			log.Debug("Bad Request")
 			http.Error(w, "Bad Request", http.StatusBadRequest)
 		}
 
 		// Handle POST request
 	case http.MethodGet:
-		fmt.Println("Request Method: GET")
 
 		pathComponents := strings.Split(req.URL.Path, "/")
 		switch len(pathComponents) {
 		case 1:
 			// Server Root
-			fmt.Println("No path components")
+			log.Info("No path components")
 		case 2:
 			/// Resource Type Search
 			fhirSearch(w, req, pathComponents[1])
@@ -280,21 +300,18 @@ func parseQueryString(w http.ResponseWriter, req *http.Request) {
 			fhirRead(w, req, pathComponents[1], pathComponents[2])
 		case 4:
 			// Compartment Search
-			fmt.Println("Compartment Search")
-			fmt.Println("  Component: ", pathComponents[1])
-			fmt.Println("  ID: ", pathComponents[2])
-			fmt.Println("  Type: ", pathComponents[3])
+			log.Info("Compartment Search")
+			log.Info("Component", "value", pathComponents[1])
+			log.Info("ID", "value", pathComponents[2])
+			log.Info("Type", "value", pathComponents[3])
 		default:
-			fmt.Println("Bad Request")
+			log.Error("Bad Request")
 			http.Error(w, "Bad Request", http.StatusBadRequest)
 		}
 
 	default:
-		fmt.Println("Request Method: Other")
+		log.Info("Request Method: Other")
 	}
-
-	fmt.Println("-----------")
-	fmt.Println("")
 }
 
 func main() {
@@ -315,7 +332,7 @@ func main() {
 		os.Exit(1)
 	}
 	upstream = args[0]
-	fmt.Printf("Upstream server: %s\n", upstream)
+	log.Info(fmt.Sprintf("FHIR RTG started with upstream server %s", upstream))
 
 	introspect()
 

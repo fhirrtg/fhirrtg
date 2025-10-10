@@ -46,18 +46,18 @@ Configuration is done via environment variables:
 
 | Variable | Description | Default Value |
 |----------|-------------|---------------|
-| `FHIRRTG_PORT` | Port the server will listen on | `8888` |
+| `PORT` | Port the server will listen on | `8888` |
 | `LOG_LEVEL` | Logging verbosity (debug, info, warn, error) | `info` |
+| `SKIP_TLS_VERIFY` | Skip certificate verification | `false` |
 | `GRAPHQL_TIMEOUT` | Timeout for GraphQL requests (in seconds) | `30` |
 | `MAX_CONNECTIONS` | Maximum number of concurrent connections | `100` |
-| `FHIRRTG_SKIP_TLS_VERIFY` | Skip certificate verification | `false` |
 
 Example:
 
 ```bash
 
   # Run with custom configuration
-  LOG_LEVEL=debug FHIRRTG_PORT=9000 ./fhirrtg https://your-graphql-endpoint/graphql
+  LOG_LEVEL=debug PORT=9000 ./fhirrtg https://your-graphql-endpoint/graphql
 ```
 
 ## API Documentation
