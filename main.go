@@ -205,6 +205,25 @@ func parseQueryString(w http.ResponseWriter, req *http.Request) {
 	switch req.Method {
 	case http.MethodPost:
 		fmt.Println("Request Method: POST")
+		pathComponents := strings.Split(req.URL.Path, "/")
+
+		switch len(pathComponents) {
+		case 1:
+			// Server Root
+			fmt.Println("No path components")
+		case 2:
+			/// Create Resource
+			fmt.Println("Create Resource")
+			fmt.Println("  Type: ", pathComponents[1])
+			FhirCreate(w, req, pathComponents[1])
+		case 3:
+			// Update Resource
+		default:
+			fmt.Println("Bad Request")
+			http.Error(w, "Bad Request", http.StatusBadRequest)
+		}
+
+		// Handle POST request
 	case http.MethodGet:
 		fmt.Println("Request Method: GET")
 
