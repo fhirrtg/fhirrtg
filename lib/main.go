@@ -29,7 +29,7 @@ var (
 
 func init() {
 	var logLevel slog.Level
-	logLevelStr := getEnv("LOG_LEVEL", "info")
+	logLevelStr := getEnv("RTG_LOG_LEVEL", "info")
 	switch strings.ToLower(logLevelStr) {
 	case "debug":
 		logLevel = slog.LevelDebug
@@ -45,7 +45,7 @@ func init() {
 	}
 	log = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel}))
 
-	portStr := getEnv("PORT", strconv.Itoa(DEFAULT_PORT))
+	portStr := getEnv("RTG_PORT", strconv.Itoa(DEFAULT_PORT))
 	port, err := strconv.Atoi(portStr)
 	if err != nil {
 		fmt.Printf("Invalid port number: %s, using default: %d\n", portStr, DEFAULT_PORT)
@@ -54,8 +54,8 @@ func init() {
 		PORT = port
 	}
 
-	GQL_ACCEPT_HEADER = getEnv("GQL_ACCEPT_HEADER", DEFAULT_GQL_ACCEPT_HEADER)
-	SKIP_TLS_VERIFY = getEnv("SKIP_TLS_VERIFY", "false") == "true"
+	GQL_ACCEPT_HEADER = getEnv("RTG_GQL_ACCEPT_HEADER", DEFAULT_GQL_ACCEPT_HEADER)
+	SKIP_TLS_VERIFY = getEnv("RTG_SKIP_TLS_VERIFY", "false") == "true"
 
 	client = &http.Client{
 		Transport: &http.Transport{
