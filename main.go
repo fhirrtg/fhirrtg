@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"net/http"
-	"net/url"
 	"os"
 	"strings"
 
@@ -108,7 +107,8 @@ func FullResourceRequest(
 	return query
 }
 
-func fhirSearch(w http.ResponseWriter, queryString url.Values, resourceType string) {
+func fhirSearch(w http.ResponseWriter, req *http.Request, resourceType string) {
+	queryString := req.URL.Query()
 	profile := queryString.Get("_profile")
 	fragment := GenerateFragment(resourceType)
 	fragments := map[string]gql.Fragment{resourceType: fragment}
@@ -163,11 +163,12 @@ func fhirSearch(w http.ResponseWriter, queryString url.Values, resourceType stri
 	fmt.Println(gqlStr)
 
 	resp := GqlRequest(gqlStr, profile)
-	postProcessed := PostProcess(resp)
+	postProcessed := PostProcess(resp, req)
 	w.Write(postProcessed)
 }
 
-func fhirRead(w http.ResponseWriter, queryString url.Values, resourceType string, id string) {
+func fhirRead(w http.ResponseWriter, req *http.Request, resourceType string, id string) {
+	queryString := req.URL.Query()
 	profile := queryString.Get("_profile")
 	fragment := GenerateFragment(resourceType)
 	fragments := map[string]gql.Fragment{resourceType: fragment}
@@ -213,10 +214,10 @@ func parseQueryString(w http.ResponseWriter, req *http.Request) {
 			fmt.Println("No path components")
 		case 2:
 			/// Resource Type Search
-			fhirSearch(w, req.URL.Query(), pathComponents[1])
+			fhirSearch(w, req, pathComponents[1])
 		case 3:
 			// Resource Type Read
-			fhirRead(w, req.URL.Query(), pathComponents[1], pathComponents[2])
+			fhirRead(w, req, pathComponents[1], pathComponents[2])
 		case 4:
 			// Compartment Search
 			fmt.Println("Compartment Search")
