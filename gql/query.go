@@ -53,16 +53,24 @@ func (a ArgumentValue) String() string {
 
 // Field represents a GraphQL field (e.g., "id", "name")
 type Field struct {
-	Name      string
-	SubFields []Field
-	Alias     string
-	Arguments Arguments
-	Type      string
-	Kind      string
-	Fragments []Fragment
+	Name       string
+	SubFields  []Field
+	Alias      string
+	Arguments  Arguments
+	Type       string
+	Kind       string
+	Connection bool
+	Fragments  []Fragment
 }
 
 func (f Field) String() string {
+	if f.Kind == "LIST" || f.Connection {
+		return f.connectionString()
+	}
+	return f.regularString()
+}
+
+func (f Field) regularString() string {
 	var args []string
 	for key, value := range f.Arguments {
 		args = append(args, fmt.Sprintf("%s: %s", key, value.String()))
@@ -94,6 +102,30 @@ func (f Field) String() string {
 	}
 
 	return fieldStr
+}
+
+func (f Field) connectionString() string {
+	fields := []Field{
+		{Name: "pageInfo", SubFields: []Field{
+			{Name: "hasNextPage"},
+			{Name: "hasPreviousPage"},
+			{Name: "startCursor"},
+			{Name: "endCursor"},
+		}},
+		{Name: "edges", SubFields: []Field{
+			{Name: "cursor"},
+			{Name: "node", SubFields: f.SubFields, Fragments: f.Fragments},
+		}},
+	}
+
+	connectionField := Field{
+		Name:      f.Name + "Connection",
+		Alias:     f.Alias,
+		Arguments: f.Arguments,
+		SubFields: fields,
+	}
+
+	return connectionField.regularString()
 }
 
 // Query represents the full GraphQL query AST

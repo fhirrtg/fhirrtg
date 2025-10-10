@@ -79,10 +79,11 @@ func FullResourceRequest(
 	}
 
 	primaryField := gql.Field{
-		Name:      resourceType,
-		Arguments: primaryArgs,
-		Fragments: []gql.Fragment{fragments[resourceType]},
-		SubFields: subFields,
+		Name:       resourceType,
+		Arguments:  primaryArgs,
+		Fragments:  []gql.Fragment{fragments[resourceType]},
+		SubFields:  subFields,
+		Connection: true,
 	}
 
 	fields = append(fields, primaryField)
@@ -90,9 +91,10 @@ func FullResourceRequest(
 	for _, revinclude := range revincludes {
 		revincludeFrag := fragments[revinclude.ResourceName]
 		revField := gql.Field{
-			Name:      revinclude.ResourceName,
-			Arguments: gql.Arguments{revinclude.FieldName: gql.ArgumentValue{SubArguments: searchParams}},
-			Fragments: []gql.Fragment{revincludeFrag},
+			Name:       revinclude.ResourceName,
+			Arguments:  gql.Arguments{revinclude.FieldName: gql.ArgumentValue{SubArguments: searchParams}},
+			Fragments:  []gql.Fragment{revincludeFrag},
+			Connection: true,
 		}
 		fields = append(fields, revField)
 	}
@@ -161,6 +163,39 @@ func fhirSearch(w http.ResponseWriter, queryString url.Values, resourceType stri
 	fmt.Println(gqlStr)
 
 	resp := GqlRequest(gqlStr, profile)
+	postProcessed := PostProcess(resp)
+	w.Write(postProcessed)
+}
+
+func fhirRead(w http.ResponseWriter, queryString url.Values, resourceType string, id string) {
+	profile := queryString.Get("_profile")
+	fragment := GenerateFragment(resourceType)
+	fragments := map[string]gql.Fragment{resourceType: fragment}
+
+	query := gql.Query{
+		Operation: "query",
+		Name:      "Get" + resourceType,
+		Fields: []gql.Field{
+			{
+				Name: resourceType,
+				Arguments: gql.Arguments{
+					"id": gql.ArgumentValue{Value: id},
+				},
+				Fragments: []gql.Fragment{fragments[resourceType]},
+			},
+		},
+	}
+
+	gqlStr := ""
+	for _, fragment := range fragments {
+		gqlStr += fragment.String() + "\n"
+	}
+	gqlStr += query.String()
+
+	fmt.Println("GQL Query:")
+	fmt.Println(gqlStr)
+
+	resp := GqlRequest(gqlStr, profile)
 	w.Write(resp)
 }
 
@@ -181,9 +216,7 @@ func parseQueryString(w http.ResponseWriter, req *http.Request) {
 			fhirSearch(w, req.URL.Query(), pathComponents[1])
 		case 3:
 			// Resource Type Read
-			fmt.Println("Resource Type Read")
-			fmt.Println("  Type:", pathComponents[1])
-			fmt.Println("  ID:", pathComponents[2])
+			fhirRead(w, req.URL.Query(), pathComponents[1], pathComponents[2])
 		case 4:
 			// Compartment Search
 			fmt.Println("Compartment Search")
@@ -204,7 +237,8 @@ func parseQueryString(w http.ResponseWriter, req *http.Request) {
 }
 
 func main() {
-	fmt.Println(`    ________  __________     ____  ____________
+	fmt.Println(`
+    ________  __________     ____  ____________
    / ____/ / / /  _/ __ \   / __ \/_  __/ ____/
   / /_  / /_/ // // /_/ /  / /_/ / / / / / __  
  / __/ / __  // // _, _/  / _, _/ / / / /_/ /  
