@@ -23,8 +23,12 @@ var (
 	PORT              int
 	GQL_ACCEPT_HEADER string
 	SKIP_TLS_VERIFY   bool
-	client            *http.Client
-	log               *slog.Logger
+)
+
+var (
+	client   *http.Client
+	log      *slog.Logger
+	upstream string
 )
 
 func init() {
@@ -64,106 +68,6 @@ func init() {
 			},
 		},
 	}
-}
-
-// getEnv retrieves the value of the environment variable named by the key
-// If the variable is not present, returns the fallback value
-func getEnv(key, fallback string) string {
-	if value, exists := os.LookupEnv(key); exists {
-		return value
-	}
-	return fallback
-}
-
-var (
-	// Upstream Server URL
-	upstream string
-)
-
-func GenerateFragment(typeName string) gql.Fragment {
-	schema := schemaDict[typeName]
-
-	fragment := gql.Fragment{
-		Name:   typeName + "Fragment",
-		Type:   typeName,
-		Fields: buildFieldTree(schema.Fields, 0),
-	}
-
-	return fragment
-}
-
-func findField(fields []gql.Field, fieldName string) gql.Field {
-	for _, field := range fields {
-		if field.Name == fieldName {
-			return field
-		}
-	}
-
-	return gql.Field{}
-}
-
-func FullResourceRequest(
-	resourceType string,
-	searchParams gql.Arguments,
-	includes []IncludeParam,
-	revincludes []IncludeParam,
-	fragments map[string]gql.Fragment,
-) gql.Query {
-
-	subFields := []gql.Field{}
-	for _, include := range includes {
-		includeFrags := []gql.Fragment{}
-		for _, possibleType := range include.PossibleTypes {
-			includeFrags = append(includeFrags, fragments[possibleType])
-		}
-		subFields = append(subFields, gql.Field{
-			Name: include.FieldName,
-			SubFields: []gql.Field{
-				{
-					Name:      "resource",
-					Fragments: includeFrags,
-				},
-			},
-		})
-	}
-
-	fields := []gql.Field{}
-
-	var primaryArgs gql.Arguments
-	if len(searchParams) > 0 {
-		primaryArgs = gql.Arguments{"search": gql.ArgumentValue{SubArguments: searchParams}}
-	} else {
-		primaryArgs = nil
-	}
-
-	primaryField := gql.Field{
-		Name:       resourceType,
-		Arguments:  primaryArgs,
-		Fragments:  []gql.Fragment{fragments[resourceType]},
-		SubFields:  subFields,
-		Connection: true,
-	}
-
-	fields = append(fields, primaryField)
-
-	for _, revinclude := range revincludes {
-		revincludeFrag := fragments[revinclude.ResourceName]
-		revField := gql.Field{
-			Name:       revinclude.ResourceName,
-			Arguments:  gql.Arguments{revinclude.FieldName: gql.ArgumentValue{SubArguments: searchParams}},
-			Fragments:  []gql.Fragment{revincludeFrag},
-			Connection: true,
-		}
-		fields = append(fields, revField)
-	}
-
-	query := gql.Query{
-		Operation: "query",
-		Name:      "Get" + resourceType,
-		Fields:    fields,
-	}
-
-	return query
 }
 
 func fhirSearch(w http.ResponseWriter, req *http.Request, resourceType string) {

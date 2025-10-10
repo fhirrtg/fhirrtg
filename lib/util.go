@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 )
 
 func GqlRequest(gql string, profile string) []byte {
@@ -42,4 +43,13 @@ func GqlRequest(gql string, profile string) []byte {
 	}
 
 	return body
+}
+
+// getEnv retrieves the value of the environment variable named by the key
+// If the variable is not present, returns the fallback value
+func getEnv(key, fallback string) string {
+	if value, exists := os.LookupEnv(key); exists {
+		return value
+	}
+	return fallback
 }

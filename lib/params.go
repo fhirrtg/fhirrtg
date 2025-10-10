@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"strings"
+
+	"github.com/fhirrtg/fhirrtg/gql"
 )
 
 type IncludeParam struct {
@@ -42,4 +44,14 @@ func parseIncludeParam(includeParam string) (IncludeParam, error) {
 	log.Debug(fmt.Sprintf("Include Resource: %v\n", unionType.PossibleTypes))
 
 	return include, nil
+}
+
+func findField(fields []gql.Field, fieldName string) gql.Field {
+	for _, field := range fields {
+		if field.Name == fieldName {
+			return field
+		}
+	}
+
+	return gql.Field{}
 }
