@@ -90,21 +90,24 @@ func introspect() {
 	fd := buildFieldDict(body)
 
 	// Print the field dictionary
-	log.Debug("Field Dictionary:")
+	debugStr := "Field Dictionary:"
+
 	for key, value := range fd {
-		log.Debug(fmt.Sprintf("%s [%s]", key, value.Kind))
+		debugStr += fmt.Sprintf("%s [%s]\n", key, value.Kind)
 		if value.PossibleTypes != nil {
 			names := []string{}
 			for _, pt := range value.PossibleTypes {
 				names = append(names, pt.Name)
 			}
-			log.Debug(fmt.Sprintf("    ((%s))", strings.Join(names, ", ")))
+			debugStr += fmt.Sprintf("    ((%s))\n", strings.Join(names, ", "))
 		}
 		for _, field := range value.Fields {
-			log.Debug(fmt.Sprintf("   %s (%s|%s)", field.Name, field.Type, field.Kind))
+			debugStr += fmt.Sprintf("   %s (%s|%s)\n", field.Name, field.Type, field.Kind)
 		}
 	}
-	log.Debug("-------------------")
+	if LOG_LEVEL < 0 {
+		fmt.Println(debugStr)
+	}
 }
 
 func buildFieldDict(response []byte) map[string]gql.SchemaType {

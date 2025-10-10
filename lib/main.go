@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/fhirrtg/fhirrtg/gql"
 )
@@ -22,7 +23,7 @@ const (
 var (
 	PORT              int
 	GQL_ACCEPT_HEADER string
-	SKIP_TLS_VERIFY   bool
+	LOG_LEVEL         slog.Level
 )
 
 var (
@@ -32,22 +33,21 @@ var (
 )
 
 func init() {
-	var logLevel slog.Level
 	logLevelStr := getEnv("RTG_LOG_LEVEL", "info")
 	switch strings.ToLower(logLevelStr) {
 	case "debug":
-		logLevel = slog.LevelDebug
+		LOG_LEVEL = slog.LevelDebug
 	case "info":
-		logLevel = slog.LevelInfo
+		LOG_LEVEL = slog.LevelInfo
 	case "warn":
-		logLevel = slog.LevelWarn
+		LOG_LEVEL = slog.LevelWarn
 	case "error":
-		logLevel = slog.LevelError
+		LOG_LEVEL = slog.LevelError
 	default:
-		logLevel = slog.LevelInfo
+		LOG_LEVEL = slog.LevelInfo
 		fmt.Printf("Invalid log level: %s, using default: info\n", logLevelStr)
 	}
-	log = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel}))
+	log = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: LOG_LEVEL}))
 
 	portStr := getEnv("RTG_PORT", strconv.Itoa(DEFAULT_PORT))
 	port, err := strconv.Atoi(portStr)
@@ -59,12 +59,21 @@ func init() {
 	}
 
 	GQL_ACCEPT_HEADER = getEnv("RTG_GQL_ACCEPT_HEADER", DEFAULT_GQL_ACCEPT_HEADER)
-	SKIP_TLS_VERIFY = getEnv("RTG_SKIP_TLS_VERIFY", "false") == "true"
+
+	// HTTP Client Setup
+	skipTlsVerify := getEnv("RTG_SKIP_TLS_VERIFY", "false") == "true"
+	timeoutStr := getEnv("RTG_GRAPHQL_TIMEOUT", "30")
+	timeout, err := strconv.Atoi(timeoutStr)
+	if err != nil {
+		fmt.Printf("Invalid timeout value: %s, using default: 30\n", timeoutStr)
+		timeout = 30
+	}
 
 	client = &http.Client{
+		Timeout: time.Duration(timeout) * time.Second,
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: SKIP_TLS_VERIFY,
+				InsecureSkipVerify: skipTlsVerify,
 			},
 		},
 	}
@@ -122,8 +131,9 @@ func fhirSearch(w http.ResponseWriter, req *http.Request, resourceType string) {
 	query := FullResourceRequest(resourceType, searchParams, includes, revincludes, fragments)
 	gqlStr += query.String()
 
-	// fmt.Println("GQL Query:")
-	log.Debug(gqlStr)
+	if LOG_LEVEL < 0 {
+		fmt.Println(gqlStr)
+	}
 
 	resp := GqlRequest(gqlStr, profile)
 	bundle := ProcessBundle(resp, req)
@@ -239,14 +249,6 @@ func main() {
 	log.Info(fmt.Sprintf("FHIR RTG started with upstream server %s", upstream))
 
 	introspect()
-
-	// fmt.Println("-----------\n Reqeust:")
-	// patientFragment := GenerateFragment("Patient")
-	// encounterFragment := GenerateFragment("Encounter")
-	// q := FullResourceRequest(encounterFragment)
-	// fmt.Print(patientFragment.String())
-	// fmt.Print(encounterFragment.String())
-	// fmt.Println(q.String())
 
 	http.HandleFunc("/", parseQueryString)
 	http.ListenAndServe(fmt.Sprintf(":%d", PORT), nil)

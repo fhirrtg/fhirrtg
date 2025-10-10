@@ -48,10 +48,9 @@ Configuration is done via environment variables:
 |----------|-------------|---------------|
 | `RTG_PORT` | Port the server will listen on | `8888` |
 | `RTG_LOG_LEVEL` | Logging verbosity (debug, info, warn, error) | `info` |
-| `RTG_SKIP_TLS_VERIFY` | Skip certificate verification | `false` |
-| `RTG_GQL_ACCEPT_HEADER` | HTTP Accept header for upstream server | `application/graphql-response+json;charset=utf-8, application/json;charset=utf-8` |
+| `RTG_SKIP_TLS_VERIFY` | Skip upstream certificate verification | `false` |
 | `RTG_GRAPHQL_TIMEOUT` | Timeout for GraphQL requests (in seconds) | `30` |
-| `RTG_MAX_CONNECTIONS` | Maximum number of concurrent connections | `100` |
+| `RTG_GQL_ACCEPT_HEADER` | HTTP Accept header for upstream server | `application/graphql-response+json;charset=utf-8, application/json;charset=utf-8` |
 
 Example:
 
