@@ -51,7 +51,7 @@ func createEntry(resource map[string]interface{}, req *http.Request, searchType 
 	return entry
 }
 
-func PostProcess(body []byte, req *http.Request) []byte {
+func ProcessBundle(body []byte, req *http.Request) []byte {
 	var jsonData map[string]interface{}
 	err := json.Unmarshal(body, &jsonData)
 	if err != nil {
@@ -123,6 +123,50 @@ func PostProcess(body []byte, req *http.Request) []byte {
 	}
 
 	return body
+}
+
+func ProcessRead(body []byte, req *http.Request) []byte {
+	var result map[string]interface{}
+	err := json.Unmarshal(body, &result)
+	if err != nil {
+		// Return original if we can't unmarshal
+		return body
+	}
+
+	// Check if there is an error key and return the original body if it exists
+	if errorVal, hasError := result["errors"]; hasError && errorVal != nil {
+		return body
+	}
+
+	var resource map[string]interface{}
+
+	// Extract the resource from data.[resourceType] structure
+	if data, ok := result["data"].(map[string]interface{}); ok {
+		// get the first key in data
+		for _, v := range data {
+			if res, ok := v.(map[string]interface{}); ok {
+				resource = res
+				break
+			}
+		}
+	}
+
+	if resource == nil {
+		// Return original if we couldn't find the resource
+		return body
+	}
+
+	// Remove empty values
+	removeEmpties(resource)
+
+	// Marshal the resource into JSON and return it
+	resourceBody, err := json.Marshal(resource)
+	if err != nil {
+		// Return original if we can't marshal
+		return body
+	}
+
+	return resourceBody
 }
 
 func fullHost(req *http.Request) string {

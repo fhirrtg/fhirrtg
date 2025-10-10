@@ -163,8 +163,8 @@ func fhirSearch(w http.ResponseWriter, req *http.Request, resourceType string) {
 	fmt.Println(gqlStr)
 
 	resp := GqlRequest(gqlStr, profile)
-	postProcessed := PostProcess(resp, req)
-	w.Write(postProcessed)
+	bundle := ProcessBundle(resp, req)
+	w.Write(bundle)
 }
 
 func fhirRead(w http.ResponseWriter, req *http.Request, resourceType string, id string) {
@@ -197,7 +197,8 @@ func fhirRead(w http.ResponseWriter, req *http.Request, resourceType string, id 
 	fmt.Println(gqlStr)
 
 	resp := GqlRequest(gqlStr, profile)
-	w.Write(resp)
+	resource := ProcessRead(resp, req)
+	w.Write(resource)
 }
 
 func parseQueryString(w http.ResponseWriter, req *http.Request) {
