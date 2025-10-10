@@ -143,7 +143,7 @@ func fhirSearch(w http.ResponseWriter, queryString url.Values, resourceType stri
 
 	var searchParams = make(gql.Arguments)
 	for key, value := range queryString {
-		if strings.HasPrefix(key, "_") {
+		if strings.HasPrefix(key, "_") && key != "_id" {
 			continue
 		}
 		searchParams[key] = gql.ArgumentValue{Value: value[0]}
