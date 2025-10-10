@@ -1,20 +1,60 @@
 package main
 
 import (
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/telus/fhirrtg/gql"
 )
 
 const (
-	VERSION           = "0.1"
-	PORT              = 8888
-	GQL_ACCEPT_HEADER = "application/graphql-response+json;charset=utf-8, application/json;charset=utf-8"
+	VERSION                   = "0.1"
+	DEFAULT_PORT              = 8888
+	DEFAULT_GQL_ACCEPT_HEADER = "application/graphql-response+json;charset=utf-8, application/json;charset=utf-8"
 )
+
+var (
+	PORT              int
+	GQL_ACCEPT_HEADER string
+	SKIP_TLS_VERIFY   bool
+	client            *http.Client
+)
+
+func init() {
+	portStr := getEnv("FHIRRTG_PORT", strconv.Itoa(DEFAULT_PORT))
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		fmt.Printf("Invalid port number: %s, using default: %d\n", portStr, DEFAULT_PORT)
+		PORT = DEFAULT_PORT
+	} else {
+		PORT = port
+	}
+
+	GQL_ACCEPT_HEADER = getEnv("FHIRRTG_GQL_ACCEPT_HEADER", DEFAULT_GQL_ACCEPT_HEADER)
+	SKIP_TLS_VERIFY = getEnv("FHIRRTG_SKIP_TLS_VERIFY", "false") == "true"
+
+	client = &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: SKIP_TLS_VERIFY,
+			},
+		},
+	}
+}
+
+// getEnv retrieves the value of the environment variable named by the key
+// If the variable is not present, returns the fallback value
+func getEnv(key, fallback string) string {
+	if value, exists := os.LookupEnv(key); exists {
+		return value
+	}
+	return fallback
+}
 
 var (
 	// Upstream Server URL

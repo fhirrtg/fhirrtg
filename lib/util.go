@@ -2,20 +2,9 @@ package main
 
 import (
 	"bytes"
-	"crypto/tls"
 	"fmt"
 	"io"
 	"net/http"
-)
-
-var (
-	client = &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
-		},
-	}
 )
 
 func GqlRequest(gql string, profile string) []byte {
