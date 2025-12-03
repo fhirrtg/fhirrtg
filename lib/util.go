@@ -19,6 +19,13 @@ func GqlRequest(gql string, profile string) []byte {
 		panic(err)
 	}
 
+	// Copy additional headers from request
+	for name, values := range req.Header {
+		for _, value := range values {
+			req.Header.Add(name, value)
+		}
+	}
+
 	// Set Headers
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", GQL_ACCEPT_HEADER)
@@ -43,6 +50,40 @@ func GqlRequest(gql string, profile string) []byte {
 	}
 
 	return body
+}
+
+func ProxyRequest(w http.ResponseWriter, req *http.Request) {
+	url := fmt.Sprintf("%s%s", upstream, req.URL.Path)
+
+	proxyReq, err := http.NewRequest(req.Method, url, req.Body)
+	if err != nil {
+		http.Error(w, "Failed to create proxy request", http.StatusInternalServerError)
+		return
+	}
+
+	// Copy headers
+	for name, values := range req.Header {
+		for _, value := range values {
+			proxyReq.Header.Add(name, value)
+		}
+	}
+
+	resp, err := client.Do(proxyReq)
+	if err != nil {
+		http.Error(w, "Failed to send proxy request", http.StatusBadGateway)
+		return
+	}
+	defer resp.Body.Close()
+
+	// Copy response headers
+	for name, values := range resp.Header {
+		for _, value := range values {
+			w.Header().Add(name, value)
+		}
+	}
+
+	w.WriteHeader(resp.StatusCode)
+	io.Copy(w, resp.Body)
 }
 
 // getEnv retrieves the value of the environment variable named by the key

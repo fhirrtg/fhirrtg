@@ -140,6 +140,14 @@ func fhirSearch(w http.ResponseWriter, req *http.Request, resourceType string) {
 	w.Write(bundle)
 }
 
+func validateResource(resourceType string) error {
+	if _, exists := schemaDict[resourceType]; !exists {
+		return fmt.Errorf("unknown resource type: %s", resourceType)
+	}
+	log.Info("validated resource type", "type", resourceType)
+	return nil
+}
+
 func fhirRead(w http.ResponseWriter, req *http.Request, resourceType string, id string) {
 	queryString := req.URL.Query()
 	profile := queryString.Get("_profile")
@@ -198,7 +206,6 @@ func parseQueryString(w http.ResponseWriter, req *http.Request) {
 			http.Error(w, "Bad Request", http.StatusBadRequest)
 		}
 
-		// Handle POST request
 	case http.MethodGet:
 
 		pathComponents := strings.Split(req.URL.Path, "/")
@@ -206,11 +213,22 @@ func parseQueryString(w http.ResponseWriter, req *http.Request) {
 		case 1:
 			// Server Root
 			log.Info("No path components")
+			ProxyRequest(w, req)
 		case 2:
 			/// Resource Type Search
+			if err := validateResource(pathComponents[1]); err != nil {
+				// Invalid resource type, proxy the request
+				ProxyRequest(w, req)
+				return
+			}
 			fhirSearch(w, req, pathComponents[1])
 		case 3:
 			// Resource Type Read
+			if err := validateResource(pathComponents[1]); err != nil {
+				// Invalid resource type, proxy the request
+				ProxyRequest(w, req)
+				return
+			}
 			fhirRead(w, req, pathComponents[1], pathComponents[2])
 		case 4:
 			// Compartment Search
