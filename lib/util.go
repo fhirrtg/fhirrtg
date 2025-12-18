@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 )
 
-func GqlRequest(gql string, profile string) []byte {
+func GqlRequest(gql string, profile string) ([]byte, error) {
 	query := fmt.Sprintf(`{"query": %q}`, gql)
 
 	url := fmt.Sprintf("%s/$graphql?_profile=%s", upstream, profile)
@@ -16,7 +17,8 @@ func GqlRequest(gql string, profile string) []byte {
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte(query)))
 
 	if err != nil {
-		panic(err)
+		slog.Error("Error creating request:", "error", err)
+		return nil, err
 	}
 
 	// Copy additional headers from request
@@ -33,23 +35,24 @@ func GqlRequest(gql string, profile string) []byte {
 	// Send request
 	resp, err := client.Do(req)
 	if err != nil {
-		fmt.Println("Error sending request:", err)
-		panic(err)
+		slog.Error("Error sending request:", "error", err)
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		panic(err)
+		slog.Error("Error reading response body:", "error", err)
+		return nil, err
 	}
 
 	if resp.StatusCode >= 400 {
 		fmt.Println("Error response from server:", resp.Status)
 		fmt.Println(string(body))
-		return body
+		return body, fmt.Errorf("error response from server: %s", resp.Status)
 	}
 
-	return body
+	return body, nil
 }
 
 func ProxyRequest(w http.ResponseWriter, req *http.Request) {

@@ -4,17 +4,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/fhirrtg/fhirrtg/gql"
 )
 
-func generateCreateMutation(resourceType string, body []byte) string {
+func generateCreateMutation(resourceType string, body []byte) (string, error) {
 	var resource map[string]interface{}
 	err := json.Unmarshal(body, &resource)
 	if err != nil {
-		panic(err)
+		slog.Error("Failed to unmarshal resource body", "error", err)
+		return "", err
 	}
 
 	// Remove id if it exists
@@ -22,7 +24,8 @@ func generateCreateMutation(resourceType string, body []byte) string {
 
 	resourceBytes, err := json.Marshal(resource)
 	if err != nil {
-		panic(err)
+		slog.Error("Failed to marshal resource body", "error", err)
+		return "", err
 	}
 
 	returnFragment := GenerateFragment(resourceType)
@@ -44,7 +47,7 @@ func generateCreateMutation(resourceType string, body []byte) string {
 		Fields:    []gql.Field{primaryField},
 	}
 	gqlStr += mutation.String()
-	return gqlStr
+	return gqlStr, nil
 }
 
 func FhirCreate(w http.ResponseWriter, req *http.Request, resourceType string) {
@@ -55,10 +58,19 @@ func FhirCreate(w http.ResponseWriter, req *http.Request, resourceType string) {
 	}
 
 	profile := req.URL.Query().Get("_profile")
-	gqlStr := generateCreateMutation(resourceType, body)
+	gqlStr, err := generateCreateMutation(resourceType, body)
+	if err != nil {
+		http.Error(w, "Failed to generate GraphQL mutation", http.StatusInternalServerError)
+		return
+	}
+
 	fmt.Println(gqlStr)
 
-	resp := GqlRequest(gqlStr, profile)
+	resp, err := GqlRequest(gqlStr, profile)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	// resource := ProcessCreate(resp, req)
 	w.Write(resp)
 	// w.Write(resp) --- IGNORE ---

@@ -135,7 +135,11 @@ func fhirSearch(w http.ResponseWriter, req *http.Request, resourceType string) {
 		fmt.Println(gqlStr)
 	}
 
-	resp := GqlRequest(gqlStr, profile)
+	resp, err := GqlRequest(gqlStr, profile)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	bundle := ProcessBundle(resp, req)
 	w.Write(bundle)
 }
@@ -177,7 +181,11 @@ func fhirRead(w http.ResponseWriter, req *http.Request, resourceType string, id 
 	log.Debug("GQL Query:")
 	log.Debug(gqlStr)
 
-	resp := GqlRequest(gqlStr, profile)
+	resp, err := GqlRequest(gqlStr, profile)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	resource := ProcessRead(resp, req)
 	w.Write(resource)
 }
@@ -266,7 +274,11 @@ func main() {
 	upstream = args[0]
 	log.Info(fmt.Sprintf("FHIR RTG started with upstream server %s", upstream))
 
-	introspect()
+	err := introspect()
+	if err != nil {
+		log.Error("Failed to introspect schema", "error", err)
+		os.Exit(1)
+	}
 
 	http.HandleFunc("/", parseQueryString)
 	http.ListenAndServe(fmt.Sprintf(":%d", PORT), nil)

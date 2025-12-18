@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/fhirrtg/fhirrtg/gql"
@@ -51,7 +52,7 @@ type IntrospectionFieldTypeDef struct {
 	OfType *IntrospectionFieldTypeDef `json:"ofType,omitempty"`
 }
 
-func introspect() {
+func introspect() error {
 	query := /* GraphQL */ `
 		{
 			__schema {
@@ -86,8 +87,14 @@ func introspect() {
 		}
 	`
 
-	body := GqlRequest(query, "")
-	fd := buildFieldDict(body)
+	body, err := GqlRequest(query, "")
+	if err != nil {
+		return err
+	}
+	fd, err := buildFieldDict(body)
+	if err != nil {
+		return err
+	}
 
 	// Print the field dictionary
 	debugStr := "Field Dictionary:"
@@ -108,14 +115,16 @@ func introspect() {
 	if LOG_LEVEL < 0 {
 		fmt.Println(debugStr)
 	}
+
+	return nil
 }
 
-func buildFieldDict(response []byte) map[string]gql.SchemaType {
+func buildFieldDict(response []byte) (map[string]gql.SchemaType, error) {
 	var introspection IntrospectionResponse
 	err := json.Unmarshal([]byte(response), &introspection)
 	if err != nil {
-		fmt.Println("Error decoding JSON:", err)
-		panic(err)
+		slog.Error("Failed to unmarshal introspection response", "error", err)
+		return nil, err
 	}
 
 	schemaDict = make(map[string]gql.SchemaType)
@@ -146,7 +155,7 @@ func buildFieldDict(response []byte) map[string]gql.SchemaType {
 		}
 	}
 
-	return schemaDict
+	return schemaDict, nil
 }
 
 func getFieldType(typeDef IntrospectionFieldTypeDef) (string, string) {
