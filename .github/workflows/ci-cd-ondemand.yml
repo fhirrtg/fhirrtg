@@ -1,0 +1,48 @@
+name: Create/Deploy/Terminate OnDemand env
+on:
+  workflow_dispatch:
+    inputs:
+      ondemand_env:
+        description: The name of environment
+        required: true
+        type: string
+      action:
+        type: choice
+        description: Deploy or terminate env
+        options:
+        - deploy
+        - terminate
+      slack_user_id:
+        description: "Optional. The Slack user Display name to mention in the deployment notification"
+        required: false
+        type: string
+
+jobs:
+  ci-build-release:
+    if: inputs.action == 'deploy'
+    uses: telus-health-ch/chr-nonprod-deployment/.github/workflows/reusable-ci-wf-ondemand.yaml@main
+    with:
+      source_repo: fhirrtg
+      dockerfile_path: ./Dockerfile
+    secrets: inherit
+
+  cd-release:
+    if: inputs.action == 'deploy'
+    uses: telus-health-ch/chr-nonprod-deployment/.github/workflows/reusable-read-pr-comment.yaml@main
+    needs: ci-build-release
+    with:
+      ondemand_env: ${{ inputs.ondemand_env }}
+      action: ${{ inputs.action }}
+      service_name: fhirrtg
+      slack_user_id: ${{ inputs.slack_user_id }}
+    secrets: inherit
+
+  cd-terminate:
+    if: inputs.action == 'terminate'
+    uses: telus-health-ch/chr-nonprod-deployment/.github/workflows/reusable-read-pr-comment.yaml@main
+    with:
+      ondemand_env: ${{ inputs.ondemand_env }}
+      action: ${{ inputs.action }}
+      service_name: fhirrtg
+      slack_user_id: ${{ inputs.slack_user_id }}
+    secrets: inherit
