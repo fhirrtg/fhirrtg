@@ -46,8 +46,10 @@ Configuration is done via environment variables:
 
 | Variable | Description | Default Value |
 |----------|-------------|---------------|
+| `RTG_UPSTREAM_SERVER` | Upstream FHIR server | |
 | `RTG_PORT` | Port the server will listen on | `8888` |
 | `RTG_LOG_LEVEL` | Logging verbosity (debug, info, warn, error) | `info` |
+| `RTG_HEALTHCHECK_PATH` | Health check endopint | `/health` |
 | `RTG_SKIP_TLS_VERIFY` | Skip upstream certificate verification | `false` |
 | `RTG_GRAPHQL_TIMEOUT` | Timeout for GraphQL requests (in seconds) | `30` |
 | `RTG_GQL_ACCEPT_HEADER` | HTTP Accept header for upstream server | `application/graphql-response+json;charset=utf-8, application/json;charset=utf-8` |
