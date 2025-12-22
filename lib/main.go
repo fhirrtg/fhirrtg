@@ -21,6 +21,7 @@ const (
 )
 
 var (
+	HEALTHCHECK_PATH  = "/health"
 	PORT              int
 	GQL_ACCEPT_HEADER string
 	LOG_LEVEL         slog.Level
@@ -58,7 +59,22 @@ func init() {
 		PORT = port
 	}
 
+	flag.Parse()
+	args := flag.Args()
+	if len(args) == 0 {
+		upstream = getEnv("RTG_UPSTREAM_SERVER", "")
+	} else {
+		upstream = args[0]
+	}
+	if upstream == "" {
+		fmt.Println("No upstream server specified")
+		os.Exit(1)
+	}
+
 	GQL_ACCEPT_HEADER = getEnv("RTG_GQL_ACCEPT_HEADER", DEFAULT_GQL_ACCEPT_HEADER)
+
+	HEALTHCHECK_PATH = getEnv("RTG_HEALTHCHECK_PATH", HEALTHCHECK_PATH)
+	log.Info("Healthcheck path set to", "path", HEALTHCHECK_PATH)
 
 	// HTTP Client Setup
 	skipTlsVerify := getEnv("RTG_SKIP_TLS_VERIFY", "false") == "true"
@@ -215,6 +231,11 @@ func parseQueryString(w http.ResponseWriter, req *http.Request) {
 		}
 
 	case http.MethodGet:
+		if req.URL.Path == HEALTHCHECK_PATH {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("OK"))
+			return
+		}
 
 		pathComponents := strings.Split(req.URL.Path, "/")
 		switch len(pathComponents) {
@@ -264,14 +285,6 @@ func main() {
                                                `)
 	fmt.Printf("FHIR RTG Server Version %s\n", VERSION)
 	fmt.Printf("Listening on port %d\n", PORT)
-
-	flag.Parse()
-	args := flag.Args()
-	if len(args) == 0 {
-		fmt.Println("No upstream server specified")
-		os.Exit(1)
-	}
-	upstream = args[0]
 	log.Info(fmt.Sprintf("FHIR RTG started with upstream server %s", upstream))
 
 	err := introspect()
