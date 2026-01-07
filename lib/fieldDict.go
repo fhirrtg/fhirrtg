@@ -87,7 +87,7 @@ func introspect() error {
 		}
 	`
 
-	body, err := GqlRequest(query, "")
+	body, err := GqlRequest(query, "", nil)
 	if err != nil {
 		return err
 	}

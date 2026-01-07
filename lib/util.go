@@ -9,7 +9,7 @@ import (
 	"os"
 )
 
-func GqlRequest(gql string, profile string) ([]byte, error) {
+func GqlRequest(gql string, profile string, origReq *http.Request) ([]byte, error) {
 	query := fmt.Sprintf(`{"query": %q}`, gql)
 
 	url := fmt.Sprintf("%s/$graphql?_profile=%s", upstream, profile)
@@ -21,17 +21,22 @@ func GqlRequest(gql string, profile string) ([]byte, error) {
 		return nil, err
 	}
 
-	// Copy additional headers from request
-	for name, values := range req.Header {
-		for _, value := range values {
-			req.Header.Add(name, value)
+	if origReq != nil {
+		// Copy additional headers from request
+		for name, values := range origReq.Header {
+			for _, value := range values {
+				req.Header.Add(name, value)
+			}
 		}
+
+		// Add client IP to headers
+		clientIP := origReq.RemoteAddr
+		req.Header.Set("X-Forwarded-For", clientIP)
 	}
 
 	// Set Headers
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", GQL_ACCEPT_HEADER)
-
 	// Send request
 	resp, err := client.Do(req)
 	if err != nil {
@@ -55,20 +60,27 @@ func GqlRequest(gql string, profile string) ([]byte, error) {
 	return body, nil
 }
 
-func ProxyRequest(w http.ResponseWriter, req *http.Request) {
-	url := fmt.Sprintf("%s%s", upstream, req.URL.Path)
+func ProxyRequest(w http.ResponseWriter, origReq *http.Request) {
+	url := fmt.Sprintf("%s%s", upstream, origReq.URL.Path)
 
-	proxyReq, err := http.NewRequest(req.Method, url, req.Body)
+	proxyReq, err := http.NewRequest(origReq.Method, url, origReq.Body)
 	if err != nil {
 		http.Error(w, "Failed to create proxy request", http.StatusInternalServerError)
 		return
 	}
 
-	// Copy headers
-	for name, values := range req.Header {
-		for _, value := range values {
-			proxyReq.Header.Add(name, value)
+	if origReq != nil {
+		// Copy headers
+		for name, values := range origReq.Header {
+			for _, value := range values {
+				proxyReq.Header.Add(name, value)
+			}
 		}
+
+		// Add client IP to headers
+		clientIP := origReq.RemoteAddr
+		proxyReq.Header.Set("X-Forwarded-For", clientIP)
+		slog.Debug("Proxying request", "client_ip", clientIP)
 	}
 
 	resp, err := client.Do(proxyReq)

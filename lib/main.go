@@ -151,7 +151,7 @@ func fhirSearch(w http.ResponseWriter, req *http.Request, resourceType string) {
 		fmt.Println(gqlStr)
 	}
 
-	resp, err := GqlRequest(gqlStr, profile)
+	resp, err := GqlRequest(gqlStr, profile, req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -197,7 +197,7 @@ func fhirRead(w http.ResponseWriter, req *http.Request, resourceType string, id 
 	log.Debug("GQL Query:")
 	log.Debug(gqlStr)
 
-	resp, err := GqlRequest(gqlStr, profile)
+	resp, err := GqlRequest(gqlStr, profile, req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
