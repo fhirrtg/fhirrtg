@@ -52,8 +52,7 @@ func GqlRequest(gql string, profile string, origReq *http.Request) ([]byte, erro
 	}
 
 	if resp.StatusCode >= 400 {
-		fmt.Println("Error response from server:", resp.Status)
-		fmt.Println(string(body))
+		slog.Error("Error response from server:", "status", resp.Status, "body", string(body))
 		return body, fmt.Errorf("error response from server: %s", resp.Status)
 	}
 
