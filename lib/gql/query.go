@@ -48,6 +48,9 @@ func (a ArgumentValue) String() string {
 		}
 		return fmt.Sprintf("{ %s }", strings.Join(subArgs, ", "))
 	}
+	if a.Value == "" {
+		return "{}"
+	}
 	return fmt.Sprintf("%q", a.Value)
 }
 
