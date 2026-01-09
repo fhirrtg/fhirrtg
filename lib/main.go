@@ -106,7 +106,7 @@ func fhirSearch(w http.ResponseWriter, req *http.Request, resourceType string) {
 	for _, includeParam := range includeParams {
 		include, err := parseIncludeParam(includeParam)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			SendError(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
@@ -122,7 +122,7 @@ func fhirSearch(w http.ResponseWriter, req *http.Request, resourceType string) {
 	for _, revincludeParams := range revincludeParams {
 		revinclude, err := parseIncludeParam(revincludeParams)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			SendError(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
@@ -153,7 +153,7 @@ func fhirSearch(w http.ResponseWriter, req *http.Request, resourceType string) {
 
 	resp, err := GqlRequest(gqlStr, profile, req)
 	if err != nil && resp == nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		SendError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	bundle := ProcessBundle(resp, req)
@@ -199,14 +199,21 @@ func fhirRead(w http.ResponseWriter, req *http.Request, resourceType string, id 
 
 	resp, err := GqlRequest(gqlStr, profile, req)
 	if err != nil && resp == nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		SendError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	resource := ProcessRead(resp, req)
 	w.Write(resource)
 }
 
-func parseQueryString(w http.ResponseWriter, req *http.Request) {
+func SendError(w http.ResponseWriter, msg string, code int) {
+	body := OperationOutcome(strconv.Itoa(code), msg, nil)
+	w.Header().Set("Content-Type", "application/fhir+json")
+	w.WriteHeader(code)
+	w.Write(body)
+}
+
+func dispatch(w http.ResponseWriter, req *http.Request) {
 	log.Info("parsing request", "method", req.Method, "path", req.URL.Path, "query", req.URL.RawQuery, "remote_addr", req.RemoteAddr)
 
 	switch req.Method {
@@ -220,14 +227,13 @@ func parseQueryString(w http.ResponseWriter, req *http.Request) {
 			log.Info("No path components")
 		case 2:
 			/// Create Resource
-			log.Info("Create Resource")
 			log.Info("Create Resource", "type", pathComponents[1])
 			FhirCreate(w, req, pathComponents[1])
 		case 3:
 			// Update Resource
 		default:
-			log.Debug("Bad Request")
-			http.Error(w, "Bad Request", http.StatusBadRequest)
+			log.Error("Bad Request")
+			SendError(w, "Bad Request", http.StatusBadRequest)
 		}
 
 	case http.MethodGet:
@@ -261,13 +267,10 @@ func parseQueryString(w http.ResponseWriter, req *http.Request) {
 			fhirRead(w, req, pathComponents[1], pathComponents[2])
 		case 4:
 			// Compartment Search
-			log.Info("Compartment Search")
-			log.Info("Component", "value", pathComponents[1])
-			log.Info("ID", "value", pathComponents[2])
-			log.Info("Type", "value", pathComponents[3])
+			log.Info("Component Search", "component", pathComponents[1], "id", pathComponents[2], "type", pathComponents[3])
 		default:
 			log.Error("Bad Request")
-			http.Error(w, "Bad Request", http.StatusBadRequest)
+			SendError(w, "Bad Request", http.StatusBadRequest)
 		}
 
 	default:
@@ -293,6 +296,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	http.HandleFunc("/", parseQueryString)
+	http.HandleFunc("/", dispatch)
 	http.ListenAndServe(fmt.Sprintf(":%d", PORT), nil)
 }

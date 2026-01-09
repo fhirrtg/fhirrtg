@@ -2,12 +2,45 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"os"
 )
+
+func OperationOutcome(code string, text string, diagnostics *string) []byte {
+	issue := map[string]interface{}{
+		"severity": "error",
+		"code":     code,
+		"details": map[string]interface{}{
+			"text": text,
+		},
+	}
+
+	if diagnostics != nil && *diagnostics != "" {
+		issue["diagnostics"] = *diagnostics
+	}
+
+	outcome := map[string]interface{}{
+		"resourceType": "OperationOutcome",
+		"issue": []map[string]interface{}{
+			issue,
+		},
+	}
+
+	// Remove empty values
+	removeEmpties(outcome)
+
+	body, err := json.Marshal(outcome)
+	if err != nil {
+		// Return original if we can't marshal
+		return nil
+	}
+
+	return body
+}
 
 func GqlRequest(gql string, profile string, origReq *http.Request) ([]byte, error) {
 	query := fmt.Sprintf(`{"query": %q}`, gql)
@@ -64,7 +97,7 @@ func ProxyRequest(w http.ResponseWriter, origReq *http.Request) {
 
 	proxyReq, err := http.NewRequest(origReq.Method, url, origReq.Body)
 	if err != nil {
-		http.Error(w, "Failed to create proxy request", http.StatusInternalServerError)
+		SendError(w, "Failed to create proxy request", http.StatusInternalServerError)
 		return
 	}
 
@@ -84,7 +117,7 @@ func ProxyRequest(w http.ResponseWriter, origReq *http.Request) {
 
 	resp, err := client.Do(proxyReq)
 	if err != nil {
-		http.Error(w, "Failed to send proxy request", http.StatusBadGateway)
+		SendError(w, "Failed to send proxy request", http.StatusBadGateway)
 		return
 	}
 	defer resp.Body.Close()

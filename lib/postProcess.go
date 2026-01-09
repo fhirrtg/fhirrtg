@@ -154,29 +154,8 @@ func ProcessOperationOutcome(result map[string]interface{}, req *http.Request) [
 		}
 	}
 
-	outcome := map[string]interface{}{
-		"resourceType": "OperationOutcome",
-		"issue": []map[string]interface{}{
-			{
-				"severity": "error",
-				"code":     errorCode,
-				"details": map[string]interface{}{
-					"text": errorText,
-				},
-				"diagnostics": string(err_str),
-			},
-		},
-	}
-
-	// Remove empty values
-	removeEmpties(outcome)
-
-	body, err := json.Marshal(outcome)
-	if err != nil {
-		// Return original if we can't marshal
-		return nil
-	}
-
+	errStr := string(err_str)
+	body := OperationOutcome(errorCode, errorText, &errStr)
 	return body
 }
 

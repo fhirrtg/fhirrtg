@@ -1,6 +1,8 @@
 package main
 
-import "github.com/fhirrtg/fhirrtg/gql"
+import (
+	"github.com/fhirrtg/fhirrtg/gql"
+)
 
 func GenerateFragment(typeName string) gql.Fragment {
 	schema := schemaDict[typeName]
