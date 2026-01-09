@@ -68,7 +68,7 @@ func SendBundle(w http.ResponseWriter, body []byte, statusCode int, origReq *htt
 	}
 
 	// Find all "node" keys
-	entries := []FhirEntry{}
+	entries := make(map[string]FhirEntry)
 
 	var findNodes func(data map[string]interface{})
 	findNodes = func(data map[string]interface{}) {
@@ -77,11 +77,11 @@ func SendBundle(w http.ResponseWriter, body []byte, statusCode int, origReq *htt
 			switch key {
 			case "node":
 				entry := createEntry(value.(map[string]interface{}), fullHost(origReq), "match")
-				entries = append(entries, entry)
+				entries[entry.FullUrl] = entry
 
 			case "resource":
 				entry := createEntry(value.(map[string]interface{}), fullHost(origReq), "include")
-				entries = append(entries, entry)
+				entries[entry.FullUrl] = entry
 			}
 
 			// Recursively search nested maps
@@ -100,12 +100,17 @@ func SendBundle(w http.ResponseWriter, body []byte, statusCode int, origReq *htt
 
 	findNodes(jsonData)
 
+	uniqueEntries := make([]FhirEntry, 0, len(entries))
+	for _, entry := range entries {
+		uniqueEntries = append(uniqueEntries, entry)
+	}
+
 	bundle := FhirBundle{
 		ResourceType: "Bundle",
 		Type:         "searchset",
 		Timestamp:    time.Now().UTC().Format(time.RFC3339),
-		Total:        len(entries),
-		Entries:      entries,
+		Total:        len(uniqueEntries),
+		Entries:      uniqueEntries,
 	}
 
 	// Create links for the bundle
