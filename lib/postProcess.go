@@ -61,7 +61,7 @@ func ProcessBundle(body []byte, req *http.Request) []byte {
 
 	// Check if there is an error key and return the original body if it exists
 	if errorVal, hasError := jsonData["errors"]; hasError && errorVal != nil {
-		return body
+		return ProcessOperationOutcome(jsonData, req)
 	}
 
 	// Find all "node" keys
@@ -125,6 +125,39 @@ func ProcessBundle(body []byte, req *http.Request) []byte {
 	return body
 }
 
+func ProcessOperationOutcome(result map[string]interface{}, req *http.Request) []byte {
+	// Stringify the errors
+	err_str, err := json.Marshal(result["errors"])
+	if err != nil {
+		return nil
+	}
+
+	outcome := map[string]interface{}{
+		"resourceType": "OperationOutcome",
+		"issue": []map[string]interface{}{
+			{
+				"severity": "error",
+				"code":     "exception",
+				"details": map[string]interface{}{
+					"text": result["errors"].([]interface{})[0].(map[string]interface{})["message"],
+				},
+				"diagnostics": string(err_str),
+			},
+		},
+	}
+
+	// Remove empty values
+	removeEmpties(outcome)
+
+	body, err := json.Marshal(outcome)
+	if err != nil {
+		// Return original if we can't marshal
+		return nil
+	}
+
+	return body
+}
+
 func ProcessRead(body []byte, req *http.Request) []byte {
 	var result map[string]interface{}
 	err := json.Unmarshal(body, &result)
@@ -135,7 +168,7 @@ func ProcessRead(body []byte, req *http.Request) []byte {
 
 	// Check if there is an error key and return the original body if it exists
 	if errorVal, hasError := result["errors"]; hasError && errorVal != nil {
-		return body
+		return ProcessOperationOutcome(result, req)
 	}
 
 	var resource map[string]interface{}

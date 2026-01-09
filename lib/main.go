@@ -198,7 +198,7 @@ func fhirRead(w http.ResponseWriter, req *http.Request, resourceType string, id 
 	log.Debug(gqlStr)
 
 	resp, err := GqlRequest(gqlStr, profile, req)
-	if err != nil {
+	if err != nil && resp == nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
