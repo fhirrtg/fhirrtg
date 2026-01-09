@@ -72,3 +72,12 @@ func LoggerFromContext(ctx context.Context) *slog.Logger {
 	return slog.Default()
 }
 
+func LoggerFromRequest(r *http.Request) *slog.Logger {
+	var logger *slog.Logger
+	if r != nil {
+		logger = LoggerFromContext(r.Context())
+	} else {
+		logger = slog.Default()
+	}
+	return logger
+}

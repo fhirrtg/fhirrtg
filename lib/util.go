@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -45,12 +44,7 @@ func OperationOutcome(code string, text string, diagnostics *string) []byte {
 }
 
 func GqlRequest(gql string, profile string, origReq *http.Request) (*http.Response, error) {
-	var ctxLog *slog.Logger
-	if origReq != nil {
-		ctxLog = LoggerFromContext(origReq.Context())
-	} else {
-		ctxLog = slog.Default()
-	}
+	ctxLog := LoggerFromRequest(origReq)
 
 	query := fmt.Sprintf(`{"query": %q}`, gql)
 
@@ -94,12 +88,7 @@ func GqlRequest(gql string, profile string, origReq *http.Request) (*http.Respon
 }
 
 func ProxyRequest(w http.ResponseWriter, origReq *http.Request) {
-	var ctxLog *slog.Logger
-	if origReq != nil {
-		ctxLog = LoggerFromContext(origReq.Context())
-	} else {
-		ctxLog = slog.Default()
-	}
+	ctxLog := LoggerFromRequest(origReq)
 
 	url := fmt.Sprintf("%s%s", upstream, origReq.URL.Path)
 

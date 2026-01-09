@@ -52,6 +52,93 @@ func createEntry(resource map[string]interface{}, hostname string, searchType st
 	return entry
 }
 
+func SendReadResult(w http.ResponseWriter, body []byte, statusCode int) {
+	var result map[string]interface{}
+	err := json.Unmarshal(body, &result)
+	if err != nil {
+		// Return original if we can't unmarshal
+		w.WriteHeader(statusCode)
+		w.Write(body)
+		return
+	}
+
+	// Check if there is an error key and return the original body if it exists
+	if errorVal, hasError := result["errors"]; hasError && errorVal != nil {
+		SendOperationOutcome(w, result, statusCode)
+		return
+	}
+
+	var resource map[string]interface{}
+
+	// Extract the resource from data.[resourceType] structure
+	if data, ok := result["data"].(map[string]interface{}); ok {
+		// get the first key in data
+		for _, v := range data {
+			if res, ok := v.(map[string]interface{}); ok {
+				resource = res
+				break
+			}
+		}
+	}
+
+	if resource == nil {
+		// Return original if we couldn't find the resource
+		w.WriteHeader(statusCode)
+		w.Write(body)
+		return
+	}
+
+	// Remove empty values
+	removeEmpties(resource)
+
+	// Marshal the resource into JSON and return it
+	resourceBody, err := json.Marshal(resource)
+	if err != nil {
+		// Return original if we can't marshal
+		w.WriteHeader(statusCode)
+		w.Write(body)
+		return
+	}
+
+	w.WriteHeader(statusCode)
+	w.Write(resourceBody)
+}
+
+func fullHost(req *http.Request) string {
+	scheme := "http"
+	if req.TLS != nil {
+		scheme = "https"
+	}
+
+	return scheme + "://" + req.Host
+}
+
+func removeEmpties(v interface{}) {
+	switch data := v.(type) {
+	case map[string]interface{}:
+		for key, value := range data {
+			if value == nil {
+				delete(data, key)
+			} else if arr, ok := value.([]interface{}); ok && len(arr) == 0 {
+				delete(data, key)
+			} else if key == "resource" {
+				delete(data, key)
+			} else {
+				removeEmpties(value)
+			}
+		}
+	case []interface{}:
+		for _, item := range data {
+			removeEmpties(item)
+		}
+	case FhirBundle:
+		// Process each entry in the bundle
+		for i := range data.Entries {
+			removeEmpties(data.Entries[i].Resource)
+		}
+	}
+}
+
 func SendBundle(w http.ResponseWriter, body []byte, statusCode int, origReq *http.Request) {
 	var jsonData map[string]interface{}
 	err := json.Unmarshal(body, &jsonData)
@@ -174,91 +261,4 @@ func SendOperationOutcome(w http.ResponseWriter, result map[string]interface{}, 
 		w.WriteHeader(statusCode)
 	}
 	w.Write(body)
-}
-
-func SendReadResult(w http.ResponseWriter, body []byte, statusCode int) {
-	var result map[string]interface{}
-	err := json.Unmarshal(body, &result)
-	if err != nil {
-		// Return original if we can't unmarshal
-		w.WriteHeader(statusCode)
-		w.Write(body)
-		return
-	}
-
-	// Check if there is an error key and return the original body if it exists
-	if errorVal, hasError := result["errors"]; hasError && errorVal != nil {
-		SendOperationOutcome(w, result, statusCode)
-		return
-	}
-
-	var resource map[string]interface{}
-
-	// Extract the resource from data.[resourceType] structure
-	if data, ok := result["data"].(map[string]interface{}); ok {
-		// get the first key in data
-		for _, v := range data {
-			if res, ok := v.(map[string]interface{}); ok {
-				resource = res
-				break
-			}
-		}
-	}
-
-	if resource == nil {
-		// Return original if we couldn't find the resource
-		w.WriteHeader(statusCode)
-		w.Write(body)
-		return
-	}
-
-	// Remove empty values
-	removeEmpties(resource)
-
-	// Marshal the resource into JSON and return it
-	resourceBody, err := json.Marshal(resource)
-	if err != nil {
-		// Return original if we can't marshal
-		w.WriteHeader(statusCode)
-		w.Write(body)
-		return
-	}
-
-	w.WriteHeader(statusCode)
-	w.Write(resourceBody)
-}
-
-func fullHost(req *http.Request) string {
-	scheme := "http"
-	if req.TLS != nil {
-		scheme = "https"
-	}
-
-	return scheme + "://" + req.Host
-}
-
-func removeEmpties(v interface{}) {
-	switch data := v.(type) {
-	case map[string]interface{}:
-		for key, value := range data {
-			if value == nil {
-				delete(data, key)
-			} else if arr, ok := value.([]interface{}); ok && len(arr) == 0 {
-				delete(data, key)
-			} else if key == "resource" {
-				delete(data, key)
-			} else {
-				removeEmpties(value)
-			}
-		}
-	case []interface{}:
-		for _, item := range data {
-			removeEmpties(item)
-		}
-	case FhirBundle:
-		// Process each entry in the bundle
-		for i := range data.Entries {
-			removeEmpties(data.Entries[i].Resource)
-		}
-	}
 }

@@ -97,7 +97,7 @@ func init() {
 }
 
 func fhirSearch(w http.ResponseWriter, req *http.Request, resourceType string) {
-	ctxLog := LoggerFromContext(req.Context())
+	ctxLog := LoggerFromRequest(req)
 	queryString := req.URL.Query()
 	profile := queryString.Get("_profile")
 	fragment := GenerateFragment(resourceType)
@@ -154,8 +154,8 @@ func fhirSearch(w http.ResponseWriter, req *http.Request, resourceType string) {
 	}
 
 	response, err := GqlRequest(gqlStr, profile, req)
-	if err != nil {
-		SendError(w, err.Error(), response.StatusCode)
+	if err != nil || response == nil {
+		SendError(w, err.Error(), http.StatusBadGateway)
 		return
 	}
 
@@ -181,7 +181,7 @@ func validateResource(resourceType string) error {
 }
 
 func fhirRead(w http.ResponseWriter, req *http.Request, resourceType string, id string) {
-	ctxLog := LoggerFromContext(req.Context())
+	ctxLog := LoggerFromRequest(req)
 
 	queryString := req.URL.Query()
 	profile := queryString.Get("_profile")
@@ -208,12 +208,11 @@ func fhirRead(w http.ResponseWriter, req *http.Request, resourceType string, id 
 	}
 	gqlStr += query.String()
 
-	log.Debug("GQL Query:")
 	log.Debug(gqlStr)
 
 	response, err := GqlRequest(gqlStr, profile, req)
-	if err != nil {
-		SendError(w, err.Error(), response.StatusCode)
+	if err != nil || response == nil {
+		SendError(w, err.Error(), http.StatusBadGateway)
 		return
 	}
 
@@ -238,7 +237,7 @@ func SendError(w http.ResponseWriter, msg string, code int) {
 }
 
 func dispatch(w http.ResponseWriter, req *http.Request) {
-	ctxLog := LoggerFromContext(req.Context())
+	ctxLog := LoggerFromRequest(req)
 
 	switch req.Method {
 	case http.MethodPost:
