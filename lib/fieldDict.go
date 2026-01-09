@@ -52,48 +52,74 @@ type IntrospectionFieldTypeDef struct {
 	OfType *IntrospectionFieldTypeDef `json:"ofType,omitempty"`
 }
 
-func introspect() error {
-	query := /* GraphQL */ `
-		{
-			__schema {
-				types {
-					name
-					kind
-					possibleTypes {
-						name
-						kind
-					}
-					fields {
-						name
-						type {
-							name
-							kind
-							ofType {
-								name
-								kind
-								ofType {
-									name
-									kind
-									ofType {
-										name
-										kind
-									}
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-	`
+func ofTypeIntrospection(depth int, cur int) gql.Field {
+	field := gql.Field{
+		Name: "ofType",
+		SubFields: []gql.Field{
+			{Name: "name"},
+			{Name: "kind"},
+		},
+	}
+	if cur <= depth {
+		field.SubFields = append(field.SubFields, ofTypeIntrospection(depth, cur+1))
+	}
+	return field
+}
 
-	body, err := GqlRequest(query, "", nil)
+func introspect() error {
+	query := gql.Query{
+		Fields: []gql.Field{
+			{Name: "__schema",
+				SubFields: []gql.Field{
+					{
+						Name: "types",
+						SubFields: []gql.Field{
+							{Name: "name"},
+							{Name: "kind"},
+							{
+								Name: "possibleTypes",
+								SubFields: []gql.Field{
+									{Name: "name"},
+									{Name: "kind"},
+								},
+							},
+							{
+								Name: "fields",
+								SubFields: []gql.Field{
+									{Name: "name"},
+									{
+										Name: "type",
+										SubFields: []gql.Field{
+											{Name: "name"},
+											{Name: "kind"},
+											ofTypeIntrospection(2, 1),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if LOG_LEVEL < 0 {
+		fmt.Println("Introspection Query:")
+		fmt.Println(query.String())
+	}
+
+	body, err := GqlRequest(query.String(), "", nil)
 	if err != nil {
 		return err
 	}
 	fd, err := buildFieldDict(body)
 	if err != nil {
 		return err
+	}
+
+	if len(fd) == 0 {
+		return fmt.Errorf("Empty field dictionary")
 	}
 
 	// Print the field dictionary
