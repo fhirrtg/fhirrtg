@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
 	"strings"
 
 	"github.com/fhirrtg/fhirrtg/gql"
@@ -112,17 +113,19 @@ func introspect() error {
 
 	resp, err := GqlRequest(query.String(), "", nil)
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "\nIntrospection Failed:\n%s\n\n", string(err.Error()))
 		return err
 	}
 
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "\nIntrospection Failed:\n%s\n\n", string(err.Error()))
 		return err
 	}
 
 	if resp.StatusCode >= 400 {
-		slog.Error(string(body))
+		fmt.Fprintf(os.Stderr, "\nIntrospection Failed: %s\n\n", string(body))
 		return fmt.Errorf("introspection query failed: %s %s: %s", resp.Status, "response", string(body))
 	}
 
@@ -132,6 +135,7 @@ func introspect() error {
 	}
 
 	if len(fd) == 0 {
+		fmt.Fprintf(os.Stderr, "\nIntrospection Failed: Empty field dictionary\n\n")
 		return fmt.Errorf("Empty field dictionary")
 	}
 

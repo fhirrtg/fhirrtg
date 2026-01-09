@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"flag"
 	"fmt"
@@ -8,8 +9,10 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/fhirrtg/fhirrtg/gql"
@@ -73,9 +76,7 @@ func init() {
 	}
 
 	GQL_ACCEPT_HEADER = getEnv("RTG_GQL_ACCEPT_HEADER", DEFAULT_GQL_ACCEPT_HEADER)
-
 	HEALTHCHECK_PATH = getEnv("RTG_HEALTHCHECK_PATH", HEALTHCHECK_PATH)
-	log.Info("Healthcheck path set to", "path", HEALTHCHECK_PATH)
 
 	// HTTP Client Setup
 	skipTlsVerify := getEnv("RTG_SKIP_TLS_VERIFY", "false") == "true"
@@ -310,8 +311,6 @@ func main() {
 /_/   /_/ /_/___/_/ |_|  /_/ |_| /_/  \____/   
                                                `)
 	fmt.Printf("FHIR RTG Server Version %s\n", VERSION)
-	fmt.Printf("Listening on port %d\n", PORT)
-	log.Info(fmt.Sprintf("FHIR RTG started with upstream server %s", upstream))
 
 	err := introspect()
 	if err != nil {
@@ -319,6 +318,40 @@ func main() {
 		os.Exit(1)
 	}
 
-	http.Handle("/", LoggingMiddleware(http.HandlerFunc(dispatch)))
-	http.ListenAndServe(fmt.Sprintf(":%d", PORT), nil)
+	fmt.Printf("Upstream Server: %s\n", upstream)
+	fmt.Printf("Startup Successful! Loaded %d FHIR resource types\n", len(schemaDict))
+	fmt.Printf("Log Level: %s | Healthcheck Path: %s\n", LOG_LEVEL.String(), HEALTHCHECK_PATH)
+	fmt.Printf("Listening on port %d\n\n", PORT)
+	log.Info(fmt.Sprintf("FHIR RTG started with upstream server %s", upstream))
+
+	srv := &http.Server{
+		Addr:    fmt.Sprintf(":%d", PORT),
+		Handler: LoggingMiddleware(http.HandlerFunc(dispatch)),
+	}
+
+	// Channel to listen for interrupt signals
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+
+	// Start server in a goroutine
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Error("FHIR RTG failed to start", "error", err)
+			os.Exit(1)
+		}
+	}()
+
+	// Wait for interrupt signal
+	<-stop
+	log.Info("Shutting down gracefully...")
+
+	// Create context with timeout for shutdown
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Error("FHIR RTG forced to shutdown", "error", err)
+	}
+
+	log.Info("FHIR RTG stopped")
 }
