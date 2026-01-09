@@ -58,31 +58,17 @@ func GqlRequest(gql string, profile string, origReq *http.Request) (*http.Respon
 	}
 
 	if origReq != nil {
-		// Copy additional headers from request
-		for name, values := range origReq.Header {
-			for _, value := range values {
-				req.Header.Add(name, value)
-			}
-		}
-
-		// Add client IP to headers
+		copyHeaders(req.Header, origReq.Header)
 		addForwardedFor(req)
 	}
 
-	// Set Headers
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", GQL_ACCEPT_HEADER)
-	// Send request
 	resp, err := client.Do(req)
 	if err != nil {
 		ctxLog.Error("Error sending request:", "error", err)
 		return resp, err
 	}
-
-	// if resp.StatusCode >= 400 {
-	// 	ctxLog.Error("Error response from server:", "status", resp.Status)
-	// 	return resp, fmt.Errorf("error response from server: %s", resp.Status)
-	// }
 
 	return resp, nil
 }
@@ -99,23 +85,15 @@ func ProxyRequest(w http.ResponseWriter, origReq *http.Request) {
 	}
 
 	if origReq != nil {
-		// Copy headers
-		for name, values := range origReq.Header {
-			for _, value := range values {
-				proxyReq.Header.Add(name, value)
-			}
-		}
-
-		// Add client IP to headers
-		clientIP := origReq.RemoteAddr
-		proxyReq.Header.Set("X-Forwarded-For", clientIP)
 		ctxLog.Info("Proxying request")
+		copyHeaders(proxyReq.Header, origReq.Header)
+		addForwardedFor(proxyReq)
 	}
 
 	resp, err := client.Do(proxyReq)
 	if err != nil {
 		ctxLog.Error("Error sending proxy request upstream:", "error", err)
-		SendError(w, "Failed to send proxy request", http.StatusBadGateway)
+		SendError(w, "Failed to send proxy request", http.StatusServiceUnavailable)
 		return
 	}
 	defer resp.Body.Close()

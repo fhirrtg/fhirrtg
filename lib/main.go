@@ -155,7 +155,7 @@ func fhirSearch(w http.ResponseWriter, req *http.Request, resourceType string) {
 
 	response, err := GqlRequest(gqlStr, profile, req)
 	if err != nil || response == nil {
-		SendError(w, err.Error(), http.StatusBadGateway)
+		SendError(w, err.Error(), http.StatusServiceUnavailable)
 		return
 	}
 
@@ -212,7 +212,7 @@ func fhirRead(w http.ResponseWriter, req *http.Request, resourceType string, id 
 
 	response, err := GqlRequest(gqlStr, profile, req)
 	if err != nil || response == nil {
-		SendError(w, err.Error(), http.StatusBadGateway)
+		SendError(w, err.Error(), http.StatusServiceUnavailable)
 		return
 	}
 

@@ -121,6 +121,11 @@ func introspect() error {
 		return err
 	}
 
+	if resp.StatusCode >= 400 {
+		slog.Error(string(body))
+		return fmt.Errorf("introspection query failed: %s %s: %s", resp.Status, "response", string(body))
+	}
+
 	fd, err := buildFieldDict(body)
 	if err != nil {
 		return err
