@@ -14,6 +14,25 @@ type IncludeParam struct {
 	PossibleTypes []string
 }
 
+func KebabToLowerCamel(s string) string {
+	if !strings.Contains(s, "-") {
+		return s
+	}
+
+	parts := strings.Split(s, "-")
+	for i, p := range parts {
+		if p == "" {
+			continue
+		}
+		if i == 0 {
+			parts[i] = strings.ToLower(p)
+		} else {
+			parts[i] = strings.ToUpper(p[:1]) + strings.ToLower(p[1:])
+		}
+	}
+	return strings.Join(parts, "")
+}
+
 func parseIncludeParam(includeParam string) (IncludeParam, error) {
 	parts := strings.Split(includeParam, ":")
 
@@ -23,7 +42,7 @@ func parseIncludeParam(includeParam string) (IncludeParam, error) {
 
 	include := IncludeParam{
 		ResourceName: parts[0],
-		FieldName:    parts[1],
+		FieldName:    KebabToLowerCamel(parts[1]),
 	}
 
 	if len(parts) == 3 {
