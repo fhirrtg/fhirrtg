@@ -113,19 +113,19 @@ func introspect() error {
 
 	resp, err := GqlRequest(query.String(), "", nil)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "\nIntrospection Failed:\n%s\n\n", string(err.Error()))
+		fmt.Fprintf(os.Stderr, "\n%s\n", string(err.Error()))
 		return err
 	}
 
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "\nIntrospection Failed:\n%s\n\n", string(err.Error()))
+		fmt.Fprintf(os.Stderr, "\n%s\n", string(err.Error()))
 		return err
 	}
 
 	if resp.StatusCode >= 400 {
-		fmt.Fprintf(os.Stderr, "\nIntrospection Failed: %s\n\n", string(body))
+		fmt.Fprintf(os.Stderr, "\n%s\n", string(body))
 		return fmt.Errorf("introspection query failed: %s %s: %s", resp.Status, "response", string(body))
 	}
 
@@ -135,7 +135,7 @@ func introspect() error {
 	}
 
 	if len(fd) == 0 {
-		fmt.Fprintf(os.Stderr, "\nIntrospection Failed: Empty field dictionary\n\n")
+		fmt.Fprintf(os.Stderr, "\nEmpty field dictionary\n")
 		return fmt.Errorf("Empty field dictionary")
 	}
 

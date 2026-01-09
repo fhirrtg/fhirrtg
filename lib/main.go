@@ -25,10 +25,11 @@ const (
 )
 
 var (
-	HEALTHCHECK_PATH  = "/health"
-	PORT              int
-	GQL_ACCEPT_HEADER string
-	LOG_LEVEL         slog.Level
+	HEALTHCHECK_PATH   = "/health"
+	PORT               int
+	GQL_ACCEPT_HEADER  string
+	LOG_LEVEL          slog.Level
+	MAX_STARTUP_WAIT_S = 60 // seconds
 )
 
 var (
@@ -53,6 +54,14 @@ func init() {
 		fmt.Printf("Invalid log level: %s, using default: info\n", logLevelStr)
 	}
 	log = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: LOG_LEVEL}))
+
+	maxTimeout, err := strconv.Atoi(getEnv("RTG_MAX_STARTUP_WAIT_S", "60"))
+	if err != nil {
+		fmt.Printf("Invalid MAX_STARTUP_WAIT_S value: %s, using default: 60\n", getEnv("RTG_MAX_STARTUP_WAIT_S", "60"))
+		MAX_STARTUP_WAIT_S = 60
+	} else {
+		MAX_STARTUP_WAIT_S = maxTimeout
+	}
 
 	portStr := getEnv("RTG_PORT", strconv.Itoa(DEFAULT_PORT))
 	port, err := strconv.Atoi(portStr)
@@ -303,25 +312,34 @@ func dispatch(w http.ResponseWriter, req *http.Request) {
 }
 
 func main() {
-	fmt.Println(`
-    ________  __________     ____  ____________
-   / ____/ / / /  _/ __ \   / __ \/_  __/ ____/
-  / /_  / /_/ // // /_/ /  / /_/ / / / / / __  
- / __/ / __  // // _, _/  / _, _/ / / / /_/ /  
-/_/   /_/ /_/___/_/ |_|  /_/ |_| /_/  \____/   
-                                               `)
-	fmt.Printf("FHIR RTG Server Version %s\n", VERSION)
+	fmt.Printf("Starting FHIR RTG server with upstream %s for %d seconds...\n\n", upstream, MAX_STARTUP_WAIT_S)
 
-	err := introspect()
-	if err != nil {
-		log.Error("Failed to introspect schema", "error", err)
-		os.Exit(1)
+	startupAt := time.Now()
+	for {
+		err := introspect()
+		if err == nil {
+			break
+		}
+		if time.Since(startupAt) > time.Duration(MAX_STARTUP_WAIT_S)*time.Second {
+			fmt.Fprintf(os.Stderr, "\nFailed to connect to upstream server %s within %d seconds\n\n", upstream, MAX_STARTUP_WAIT_S)
+			os.Exit(1)
+		}
+		log.Warn("Upstream server not available, retrying...", "error", err)
+		time.Sleep(5 * time.Second)
 	}
 
-	fmt.Printf("Upstream Server: %s\n", upstream)
-	fmt.Printf("Startup Successful! Loaded %d FHIR resource types\n", len(schemaDict))
-	fmt.Printf("Log Level: %s | Healthcheck Path: %s\n", LOG_LEVEL.String(), HEALTHCHECK_PATH)
-	fmt.Printf("Listening on port %d\n\n", PORT)
+	fmt.Printf("Startup successful! Loaded %d FHIR resource types\n", len(schemaDict))
+	fmt.Println(`
+	    ________  __________     ____  ____________
+	   / ____/ / / /  _/ __ \   / __ \/_  __/ ____/
+	  / /_  / /_/ // // /_/ /  / /_/ / / / / / __  
+	 / __/ / __  // // _, _/  / _, _/ / / / /_/ /  
+	/_/   /_/ /_/___/_/ |_|  /_/ |_| /_/  \____/   
+	`)
+	fmt.Printf("FHIR RTG server version %s\n", VERSION)
+	fmt.Printf("Connected to : %s\n", upstream)
+	fmt.Printf("Log level: %s | Healthcheck path: %s\n", LOG_LEVEL.String(), HEALTHCHECK_PATH)
+	fmt.Printf("Awaiting connections on port %d\n\n", PORT)
 	log.Info(fmt.Sprintf("FHIR RTG started with upstream server %s", upstream))
 
 	srv := &http.Server{
