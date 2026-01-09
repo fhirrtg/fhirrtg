@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -51,17 +52,19 @@ func createEntry(resource map[string]interface{}, req *http.Request, searchType 
 	return entry
 }
 
-func ProcessBundle(body []byte, req *http.Request) []byte {
+func SendBundle(w http.ResponseWriter, body []byte, req *http.Request) {
 	var jsonData map[string]interface{}
 	err := json.Unmarshal(body, &jsonData)
 	if err != nil {
 		// Return original if we can't unmarshal
-		return body
+		w.Write(body)
+		return
 	}
 
 	// Check if there is an error key and return the original body if it exists
 	if errorVal, hasError := jsonData["errors"]; hasError && errorVal != nil {
-		return ProcessOperationOutcome(jsonData, req)
+		SendOperationOutcome(w, jsonData, req)
+		return
 	}
 
 	// Find all "node" keys
@@ -119,17 +122,19 @@ func ProcessBundle(body []byte, req *http.Request) []byte {
 	body, err = json.Marshal(bundle)
 	if err != nil {
 		// Return original if we can't marshal
-		return body
+		w.Write(body)
+		return
 	}
 
-	return body
+	w.Write(body)
 }
 
-func ProcessOperationOutcome(result map[string]interface{}, req *http.Request) []byte {
+func SendOperationOutcome(w http.ResponseWriter, result map[string]interface{}, req *http.Request) {
 	// Stringify the errors
 	err_str, err := json.Marshal(result["errors"])
 	if err != nil {
-		return nil
+		SendError(w, "There was an error processing the request", http.StatusInternalServerError)
+		return
 	}
 
 	// Safely extract error message with nil checks
@@ -156,20 +161,29 @@ func ProcessOperationOutcome(result map[string]interface{}, req *http.Request) [
 
 	errStr := string(err_str)
 	body := OperationOutcome(errorCode, errorText, &errStr)
-	return body
+
+	// Set appropriate HTTP status code if errorCode is a 3-digit number
+	if len(errorCode) == 3 {
+		if statusCode, err := strconv.Atoi(errorCode); err == nil && statusCode >= 100 && statusCode <= 599 {
+			w.WriteHeader(statusCode)
+		}
+	}
+	w.Write(body)
 }
 
-func ProcessRead(body []byte, req *http.Request) []byte {
+func SendRead(w http.ResponseWriter, body []byte, req *http.Request) {
 	var result map[string]interface{}
 	err := json.Unmarshal(body, &result)
 	if err != nil {
 		// Return original if we can't unmarshal
-		return body
+		w.Write(body)
+		return
 	}
 
 	// Check if there is an error key and return the original body if it exists
 	if errorVal, hasError := result["errors"]; hasError && errorVal != nil {
-		return ProcessOperationOutcome(result, req)
+		SendOperationOutcome(w, result, req)
+		return
 	}
 
 	var resource map[string]interface{}
@@ -187,7 +201,8 @@ func ProcessRead(body []byte, req *http.Request) []byte {
 
 	if resource == nil {
 		// Return original if we couldn't find the resource
-		return body
+		w.Write(body)
+		return
 	}
 
 	// Remove empty values
@@ -197,10 +212,11 @@ func ProcessRead(body []byte, req *http.Request) []byte {
 	resourceBody, err := json.Marshal(resource)
 	if err != nil {
 		// Return original if we can't marshal
-		return body
+		w.Write(body)
+		return
 	}
 
-	return resourceBody
+	w.Write(resourceBody)
 }
 
 func fullHost(req *http.Request) string {

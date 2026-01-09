@@ -156,8 +156,7 @@ func fhirSearch(w http.ResponseWriter, req *http.Request, resourceType string) {
 		SendError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	bundle := ProcessBundle(resp, req)
-	w.Write(bundle)
+	SendBundle(w, resp, req)
 }
 
 func validateResource(resourceType string) error {
@@ -202,8 +201,7 @@ func fhirRead(w http.ResponseWriter, req *http.Request, resourceType string, id 
 		SendError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	resource := ProcessRead(resp, req)
-	w.Write(resource)
+	SendRead(w, resp, req)
 }
 
 func SendError(w http.ResponseWriter, msg string, code int) {
