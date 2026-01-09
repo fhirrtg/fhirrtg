@@ -5,9 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"log/slog"
-	"net"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -72,17 +70,4 @@ func LoggerFromContext(ctx context.Context) *slog.Logger {
 		return l
 	}
 	return slog.Default()
-}
-
-// Extract client IP from X-Forwarded-For or RemoteAddr
-func clientIP(r *http.Request) string {
-	if xf := r.Header.Get("X-Forwarded-For"); xf != "" {
-		ips := strings.Split(xf, ",")
-		return strings.TrimSpace(ips[0])
-	}
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
-	}
-	return host
 }

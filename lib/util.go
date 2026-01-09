@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
+	"strings"
 )
 
 func OperationOutcome(code string, text string, diagnostics *string) []byte {
@@ -70,8 +72,7 @@ func GqlRequest(gql string, profile string, origReq *http.Request) ([]byte, int,
 		}
 
 		// Add client IP to headers
-		clientIP := origReq.RemoteAddr
-		req.Header.Set("X-Forwarded-For", clientIP)
+		addForwardedFor(req)
 	}
 
 	// Set Headers
@@ -155,4 +156,33 @@ func getEnv(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+// Extract client IP from X-Forwarded-For or RemoteAddr
+func clientIP(r *http.Request) string {
+	if xf := r.Header.Get("X-Forwarded-For"); xf != "" {
+		ips := strings.Split(xf, ",")
+		return strings.TrimSpace(ips[0]) // first is original client
+	}
+	if rip := r.Header.Get("X-Real-IP"); rip != "" {
+		return rip
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
+}
+
+func addForwardedFor(req *http.Request) {
+	orig := req.Header.Get("X-Forwarded-For")
+	ip := req.RemoteAddr
+	if host, _, err := net.SplitHostPort(ip); err == nil {
+		ip = host
+	}
+	if orig == "" {
+		req.Header.Set("X-Forwarded-For", ip)
+	} else {
+		req.Header.Set("X-Forwarded-For", orig+", "+ip)
+	}
 }
