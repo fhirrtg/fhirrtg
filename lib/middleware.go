@@ -71,3 +71,4 @@ func LoggerFromContext(ctx context.Context) *slog.Logger {
 	}
 	return slog.Default()
 }
+

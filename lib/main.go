@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -96,6 +97,7 @@ func init() {
 }
 
 func fhirSearch(w http.ResponseWriter, req *http.Request, resourceType string) {
+	ctxLog := LoggerFromContext(req.Context())
 	queryString := req.URL.Query()
 	profile := queryString.Get("_profile")
 	fragment := GenerateFragment(resourceType)
@@ -151,12 +153,23 @@ func fhirSearch(w http.ResponseWriter, req *http.Request, resourceType string) {
 		fmt.Println(gqlStr)
 	}
 
-	body, statusCode, err := GqlRequest(gqlStr, profile, req)
-	if err != nil && body == nil {
-		SendError(w, err.Error(), statusCode)
+	response, err := GqlRequest(gqlStr, profile, req)
+	if err != nil {
+		SendError(w, err.Error(), response.StatusCode)
 		return
 	}
-	SendBundle(w, body, statusCode, req)
+
+	defer response.Body.Close()
+
+	body, err := io.ReadAll(response.Body)
+	if err != nil && body == nil {
+		ctxLog.Error("Error reading response body:", "error", err)
+		SendError(w, err.Error(), response.StatusCode)
+		return
+	}
+
+	copyHeaders(w.Header(), response.Header)
+	SendBundle(w, body, response.StatusCode, req)
 }
 
 func validateResource(resourceType string) error {
@@ -168,6 +181,8 @@ func validateResource(resourceType string) error {
 }
 
 func fhirRead(w http.ResponseWriter, req *http.Request, resourceType string, id string) {
+	ctxLog := LoggerFromContext(req.Context())
+
 	queryString := req.URL.Query()
 	profile := queryString.Get("_profile")
 	fragment := GenerateFragment(resourceType)
@@ -196,12 +211,23 @@ func fhirRead(w http.ResponseWriter, req *http.Request, resourceType string, id 
 	log.Debug("GQL Query:")
 	log.Debug(gqlStr)
 
-	body, statusCode, err := GqlRequest(gqlStr, profile, req)
-	if err != nil && body == nil {
-		SendError(w, err.Error(), statusCode)
+	response, err := GqlRequest(gqlStr, profile, req)
+	if err != nil {
+		SendError(w, err.Error(), response.StatusCode)
 		return
 	}
-	SendReadResult(w, body, statusCode)
+
+	defer response.Body.Close()
+
+	body, err := io.ReadAll(response.Body)
+	if err != nil && body == nil {
+		ctxLog.Error("Error reading response body:", "error", err)
+		SendError(w, err.Error(), response.StatusCode)
+		return
+	}
+
+	copyHeaders(w.Header(), response.Header)
+	SendReadResult(w, body, response.StatusCode)
 }
 
 func SendError(w http.ResponseWriter, msg string, code int) {

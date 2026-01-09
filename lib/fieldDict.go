@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"strings"
 
@@ -109,10 +110,17 @@ func introspect() error {
 		fmt.Println(query.String())
 	}
 
-	body, _, err := GqlRequest(query.String(), "", nil)
+	resp, err := GqlRequest(query.String(), "", nil)
 	if err != nil {
 		return err
 	}
+
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
 	fd, err := buildFieldDict(body)
 	if err != nil {
 		return err

@@ -44,7 +44,7 @@ func OperationOutcome(code string, text string, diagnostics *string) []byte {
 	return body
 }
 
-func GqlRequest(gql string, profile string, origReq *http.Request) ([]byte, int, error) {
+func GqlRequest(gql string, profile string, origReq *http.Request) (*http.Response, error) {
 	var ctxLog *slog.Logger
 	if origReq != nil {
 		ctxLog = LoggerFromContext(origReq.Context())
@@ -60,7 +60,7 @@ func GqlRequest(gql string, profile string, origReq *http.Request) ([]byte, int,
 
 	if err != nil {
 		ctxLog.Error("Error creating request:", "error", err)
-		return nil, http.StatusServiceUnavailable, err
+		return nil, err
 	}
 
 	if origReq != nil {
@@ -82,22 +82,15 @@ func GqlRequest(gql string, profile string, origReq *http.Request) ([]byte, int,
 	resp, err := client.Do(req)
 	if err != nil {
 		ctxLog.Error("Error sending request:", "error", err)
-		return nil, http.StatusServiceUnavailable, err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		ctxLog.Error("Error reading response body:", "error", err)
-		return nil, http.StatusServiceUnavailable, err
+		return resp, err
 	}
 
-	if resp.StatusCode >= 400 {
-		ctxLog.Error("Error response from server:", "status", resp.Status)
-		return body, resp.StatusCode, fmt.Errorf("error response from server: %s", resp.Status)
-	}
+	// if resp.StatusCode >= 400 {
+	// 	ctxLog.Error("Error response from server:", "status", resp.Status)
+	// 	return resp, fmt.Errorf("error response from server: %s", resp.Status)
+	// }
 
-	return body, resp.StatusCode, nil
+	return resp, nil
 }
 
 func ProxyRequest(w http.ResponseWriter, origReq *http.Request) {
@@ -184,5 +177,13 @@ func addForwardedFor(req *http.Request) {
 		req.Header.Set("X-Forwarded-For", ip)
 	} else {
 		req.Header.Set("X-Forwarded-For", orig+", "+ip)
+	}
+}
+
+func copyHeaders(dst, src http.Header) {
+	for name, values := range src {
+		for _, value := range values {
+			dst.Add(name, value)
+		}
 	}
 }

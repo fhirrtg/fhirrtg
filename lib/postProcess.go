@@ -173,7 +173,6 @@ func SendOperationOutcome(w http.ResponseWriter, result map[string]interface{}, 
 	} else {
 		w.WriteHeader(statusCode)
 	}
-
 	w.Write(body)
 }
 
