@@ -159,10 +159,6 @@ func fhirSearch(w http.ResponseWriter, req *http.Request, resourceType string) {
 	query := FullResourceRequest(resourceType, searchParams, includes, revincludes, fragments)
 	gqlStr += query.String()
 
-	if LOG_LEVEL < 0 {
-		fmt.Println(gqlStr)
-	}
-
 	response, err := GqlRequest(gqlStr, profile, req)
 	if err != nil || response == nil {
 		SendError(w, err.Error(), http.StatusServiceUnavailable)
@@ -217,8 +213,6 @@ func fhirRead(w http.ResponseWriter, req *http.Request, resourceType string, id 
 		gqlStr += fragment.String() + "\n"
 	}
 	gqlStr += query.String()
-
-	log.Debug(gqlStr)
 
 	response, err := GqlRequest(gqlStr, profile, req)
 	if err != nil || response == nil {

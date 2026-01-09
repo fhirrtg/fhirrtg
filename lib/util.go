@@ -46,6 +46,10 @@ func OperationOutcome(code string, text string, diagnostics *string) []byte {
 func GqlRequest(gql string, profile string, origReq *http.Request) (*http.Response, error) {
 	ctxLog := LoggerFromRequest(origReq)
 
+	if LOG_LEVEL < 0 {
+		fmt.Printf("---------\n%s\n---------\n", gql)
+	}
+
 	query := fmt.Sprintf(`{"query": %q}`, gql)
 
 	url := fmt.Sprintf("%s/$graphql?_profile=%s", upstream, profile)
