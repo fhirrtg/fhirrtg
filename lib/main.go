@@ -163,7 +163,7 @@ func validateResource(resourceType string) error {
 	if _, exists := schemaDict[resourceType]; !exists {
 		return fmt.Errorf("unknown resource type: %s", resourceType)
 	}
-	log.Info("validated resource type", "type", resourceType)
+	log.Debug("validated resource type", "type", resourceType)
 	return nil
 }
 
@@ -212,7 +212,7 @@ func SendError(w http.ResponseWriter, msg string, code int) {
 }
 
 func dispatch(w http.ResponseWriter, req *http.Request) {
-	log.Info("parsing request", "method", req.Method, "path", req.URL.Path, "query", req.URL.RawQuery, "remote_addr", req.RemoteAddr)
+	ctxLog := LoggerFromContext(req.Context())
 
 	switch req.Method {
 	case http.MethodPost:
@@ -222,15 +222,15 @@ func dispatch(w http.ResponseWriter, req *http.Request) {
 		switch len(pathComponents) {
 		case 1:
 			// Server Root
-			log.Info("No path components")
+			ctxLog.Info("No path components")
 		case 2:
 			/// Create Resource
-			log.Info("Create Resource", "type", pathComponents[1])
+			ctxLog.Info("Create Resource", "type", pathComponents[1])
 			FhirCreate(w, req, pathComponents[1])
 		case 3:
 			// Update Resource
 		default:
-			log.Error("Bad Request")
+			ctxLog.Error("Bad Request")
 			SendError(w, "Bad Request", http.StatusBadRequest)
 		}
 
@@ -245,7 +245,7 @@ func dispatch(w http.ResponseWriter, req *http.Request) {
 		switch len(pathComponents) {
 		case 1:
 			// Server Root
-			log.Info("No path components")
+			ctxLog.Info("No path components")
 			ProxyRequest(w, req)
 		case 2:
 			/// Resource Type Search
@@ -265,14 +265,14 @@ func dispatch(w http.ResponseWriter, req *http.Request) {
 			fhirRead(w, req, pathComponents[1], pathComponents[2])
 		case 4:
 			// Compartment Search
-			log.Info("Component Search", "component", pathComponents[1], "id", pathComponents[2], "type", pathComponents[3])
+			ctxLog.Info("Component Search", "component", pathComponents[1], "id", pathComponents[2], "type", pathComponents[3])
 		default:
-			log.Error("Bad Request")
+			ctxLog.Error("Bad Request")
 			SendError(w, "Bad Request", http.StatusBadRequest)
 		}
 
 	default:
-		log.Info("Request Method: Other")
+		ctxLog.Info("Request Method: Other")
 	}
 }
 
@@ -294,6 +294,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	http.HandleFunc("/", dispatch)
+	http.Handle("/", LoggingMiddleware(http.HandlerFunc(dispatch)))
 	http.ListenAndServe(fmt.Sprintf(":%d", PORT), nil)
 }

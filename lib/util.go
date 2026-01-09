@@ -43,6 +43,13 @@ func OperationOutcome(code string, text string, diagnostics *string) []byte {
 }
 
 func GqlRequest(gql string, profile string, origReq *http.Request) ([]byte, int, error) {
+	var ctxLog *slog.Logger
+	if origReq != nil {
+		ctxLog = LoggerFromContext(origReq.Context())
+	} else {
+		ctxLog = slog.Default()
+	}
+
 	query := fmt.Sprintf(`{"query": %q}`, gql)
 
 	url := fmt.Sprintf("%s/$graphql?_profile=%s", upstream, profile)
@@ -50,8 +57,8 @@ func GqlRequest(gql string, profile string, origReq *http.Request) ([]byte, int,
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte(query)))
 
 	if err != nil {
-		slog.Error("Error creating request:", "error", err)
-		return nil, 503, err
+		ctxLog.Error("Error creating request:", "error", err)
+		return nil, http.StatusServiceUnavailable, err
 	}
 
 	if origReq != nil {
@@ -73,19 +80,19 @@ func GqlRequest(gql string, profile string, origReq *http.Request) ([]byte, int,
 	// Send request
 	resp, err := client.Do(req)
 	if err != nil {
-		slog.Error("Error sending request:", "error", err)
-		return nil, resp.StatusCode, err
+		ctxLog.Error("Error sending request:", "error", err)
+		return nil, http.StatusServiceUnavailable, err
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		slog.Error("Error reading response body:", "error", err)
-		return nil, resp.StatusCode, err
+		ctxLog.Error("Error reading response body:", "error", err)
+		return nil, http.StatusServiceUnavailable, err
 	}
 
 	if resp.StatusCode >= 400 {
-		slog.Error("Error response from server:", "status", resp.Status, "body", string(body))
+		ctxLog.Error("Error response from server:", "status", resp.Status)
 		return body, resp.StatusCode, fmt.Errorf("error response from server: %s", resp.Status)
 	}
 
@@ -93,6 +100,13 @@ func GqlRequest(gql string, profile string, origReq *http.Request) ([]byte, int,
 }
 
 func ProxyRequest(w http.ResponseWriter, origReq *http.Request) {
+	var ctxLog *slog.Logger
+	if origReq != nil {
+		ctxLog = LoggerFromContext(origReq.Context())
+	} else {
+		ctxLog = slog.Default()
+	}
+
 	url := fmt.Sprintf("%s%s", upstream, origReq.URL.Path)
 
 	proxyReq, err := http.NewRequest(origReq.Method, url, origReq.Body)
@@ -112,11 +126,12 @@ func ProxyRequest(w http.ResponseWriter, origReq *http.Request) {
 		// Add client IP to headers
 		clientIP := origReq.RemoteAddr
 		proxyReq.Header.Set("X-Forwarded-For", clientIP)
-		slog.Debug("Proxying request", "client_ip", clientIP)
+		ctxLog.Info("Proxying request")
 	}
 
 	resp, err := client.Do(proxyReq)
 	if err != nil {
+		ctxLog.Error("Error sending proxy request upstream:", "error", err)
 		SendError(w, "Failed to send proxy request", http.StatusBadGateway)
 		return
 	}
