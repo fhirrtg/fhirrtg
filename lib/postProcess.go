@@ -132,14 +132,36 @@ func ProcessOperationOutcome(result map[string]interface{}, req *http.Request) [
 		return nil
 	}
 
+	// Safely extract error message with nil checks
+	errorText := "Unknown error"
+	if errors, ok := result["errors"].([]any); ok && len(errors) > 0 {
+		if firstError, ok := errors[0].(map[string]any); ok {
+			if msg, ok := firstError["message"].(string); ok {
+				errorText = msg
+			}
+		}
+	}
+
+	// Safely extract error code from extensions
+	errorCode := "exception"
+	if errors, ok := result["errors"].([]any); ok && len(errors) > 0 {
+		if firstError, ok := errors[0].(map[string]any); ok {
+			if extensions, ok := firstError["extensions"].(map[string]any); ok {
+				if code, ok := extensions["code"].(string); ok {
+					errorCode = code
+				}
+			}
+		}
+	}
+
 	outcome := map[string]interface{}{
 		"resourceType": "OperationOutcome",
 		"issue": []map[string]interface{}{
 			{
 				"severity": "error",
-				"code":     "exception",
+				"code":     errorCode,
 				"details": map[string]interface{}{
-					"text": result["errors"].([]interface{})[0].(map[string]interface{})["message"],
+					"text": errorText,
 				},
 				"diagnostics": string(err_str),
 			},
