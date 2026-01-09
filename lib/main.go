@@ -231,7 +231,7 @@ func fhirRead(w http.ResponseWriter, req *http.Request, resourceType string, id 
 
 func SendError(w http.ResponseWriter, msg string, code int) {
 	body := OperationOutcome(strconv.Itoa(code), msg, nil)
-	w.Header().Set("Content-Type", "application/fhir+json")
+	w.Header().Set("Content-Type", "application/fhir+json; charset=utf-8")
 	w.WriteHeader(code)
 	w.Write(body)
 }
