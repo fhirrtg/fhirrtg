@@ -42,7 +42,7 @@ func OperationOutcome(code string, text string, diagnostics *string) []byte {
 	return body
 }
 
-func GqlRequest(gql string, profile string, origReq *http.Request) ([]byte, error) {
+func GqlRequest(gql string, profile string, origReq *http.Request) ([]byte, int, error) {
 	query := fmt.Sprintf(`{"query": %q}`, gql)
 
 	url := fmt.Sprintf("%s/$graphql?_profile=%s", upstream, profile)
@@ -51,7 +51,7 @@ func GqlRequest(gql string, profile string, origReq *http.Request) ([]byte, erro
 
 	if err != nil {
 		slog.Error("Error creating request:", "error", err)
-		return nil, err
+		return nil, 503, err
 	}
 
 	if origReq != nil {
@@ -74,22 +74,22 @@ func GqlRequest(gql string, profile string, origReq *http.Request) ([]byte, erro
 	resp, err := client.Do(req)
 	if err != nil {
 		slog.Error("Error sending request:", "error", err)
-		return nil, err
+		return nil, resp.StatusCode, err
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		slog.Error("Error reading response body:", "error", err)
-		return nil, err
+		return nil, resp.StatusCode, err
 	}
 
 	if resp.StatusCode >= 400 {
 		slog.Error("Error response from server:", "status", resp.Status, "body", string(body))
-		return body, fmt.Errorf("error response from server: %s", resp.Status)
+		return body, resp.StatusCode, fmt.Errorf("error response from server: %s", resp.Status)
 	}
 
-	return body, nil
+	return body, resp.StatusCode, nil
 }
 
 func ProxyRequest(w http.ResponseWriter, origReq *http.Request) {

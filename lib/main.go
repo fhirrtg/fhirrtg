@@ -151,12 +151,12 @@ func fhirSearch(w http.ResponseWriter, req *http.Request, resourceType string) {
 		fmt.Println(gqlStr)
 	}
 
-	resp, err := GqlRequest(gqlStr, profile, req)
-	if err != nil && resp == nil {
-		SendError(w, err.Error(), http.StatusInternalServerError)
+	body, statusCode, err := GqlRequest(gqlStr, profile, req)
+	if err != nil && body == nil {
+		SendError(w, err.Error(), statusCode)
 		return
 	}
-	SendBundle(w, resp, req)
+	SendBundle(w, body, statusCode, req)
 }
 
 func validateResource(resourceType string) error {
@@ -196,12 +196,12 @@ func fhirRead(w http.ResponseWriter, req *http.Request, resourceType string, id 
 	log.Debug("GQL Query:")
 	log.Debug(gqlStr)
 
-	resp, err := GqlRequest(gqlStr, profile, req)
-	if err != nil && resp == nil {
-		SendError(w, err.Error(), http.StatusInternalServerError)
+	body, statusCode, err := GqlRequest(gqlStr, profile, req)
+	if err != nil && body == nil {
+		SendError(w, err.Error(), statusCode)
 		return
 	}
-	SendRead(w, resp, req)
+	SendReadResult(w, body, statusCode)
 }
 
 func SendError(w http.ResponseWriter, msg string, code int) {

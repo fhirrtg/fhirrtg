@@ -32,7 +32,7 @@ type FhirLink struct {
 	Url      string `json:"url"`
 }
 
-func createEntry(resource map[string]interface{}, req *http.Request, searchType string) FhirEntry {
+func createEntry(resource map[string]interface{}, hostname string, searchType string) FhirEntry {
 	entryMap := resource
 
 	resourceType, _ := entryMap["resourceType"].(string)
@@ -40,7 +40,7 @@ func createEntry(resource map[string]interface{}, req *http.Request, searchType 
 
 	fullUrl := ""
 	if resourceType != "" && id != "" {
-		fullUrl = fullHost(req) + "/" + resourceType + "/" + id
+		fullUrl = hostname + "/" + resourceType + "/" + id
 	}
 	entry := FhirEntry{
 		Resource: entryMap,
@@ -52,7 +52,7 @@ func createEntry(resource map[string]interface{}, req *http.Request, searchType 
 	return entry
 }
 
-func SendBundle(w http.ResponseWriter, body []byte, req *http.Request) {
+func SendBundle(w http.ResponseWriter, body []byte, statusCode int, origReq *http.Request) {
 	var jsonData map[string]interface{}
 	err := json.Unmarshal(body, &jsonData)
 	if err != nil {
@@ -63,7 +63,7 @@ func SendBundle(w http.ResponseWriter, body []byte, req *http.Request) {
 
 	// Check if there is an error key and return the original body if it exists
 	if errorVal, hasError := jsonData["errors"]; hasError && errorVal != nil {
-		SendOperationOutcome(w, jsonData, req)
+		SendOperationOutcome(w, jsonData, statusCode)
 		return
 	}
 
@@ -76,11 +76,11 @@ func SendBundle(w http.ResponseWriter, body []byte, req *http.Request) {
 
 			switch key {
 			case "node":
-				entry := createEntry(value.(map[string]interface{}), req, "match")
+				entry := createEntry(value.(map[string]interface{}), fullHost(origReq), "match")
 				entries = append(entries, entry)
 
 			case "resource":
-				entry := createEntry(value.(map[string]interface{}), req, "include")
+				entry := createEntry(value.(map[string]interface{}), fullHost(origReq), "include")
 				entries = append(entries, entry)
 			}
 
@@ -112,7 +112,7 @@ func SendBundle(w http.ResponseWriter, body []byte, req *http.Request) {
 	bundle.Links = []FhirLink{
 		{
 			Relation: "self",
-			Url:      req.URL.String(),
+			Url:      origReq.URL.String(),
 		},
 	}
 
@@ -129,7 +129,7 @@ func SendBundle(w http.ResponseWriter, body []byte, req *http.Request) {
 	w.Write(body)
 }
 
-func SendOperationOutcome(w http.ResponseWriter, result map[string]interface{}, req *http.Request) {
+func SendOperationOutcome(w http.ResponseWriter, result map[string]interface{}, statusCode int) {
 	// Stringify the errors
 	err_str, err := json.Marshal(result["errors"])
 	if err != nil {
@@ -162,27 +162,29 @@ func SendOperationOutcome(w http.ResponseWriter, result map[string]interface{}, 
 	errStr := string(err_str)
 	body := OperationOutcome(errorCode, errorText, &errStr)
 
-	// Set appropriate HTTP status code if errorCode is a 3-digit number
-	if len(errorCode) == 3 {
-		if statusCode, err := strconv.Atoi(errorCode); err == nil && statusCode >= 100 && statusCode <= 599 {
-			w.WriteHeader(statusCode)
-		}
+	// Check if errorCode is a valid HTTP status code
+	if code, err := strconv.Atoi(errorCode); err == nil && code >= 100 && code < 600 {
+		w.WriteHeader(code)
+	} else {
+		w.WriteHeader(statusCode)
 	}
+
 	w.Write(body)
 }
 
-func SendRead(w http.ResponseWriter, body []byte, req *http.Request) {
+func SendReadResult(w http.ResponseWriter, body []byte, statusCode int) {
 	var result map[string]interface{}
 	err := json.Unmarshal(body, &result)
 	if err != nil {
 		// Return original if we can't unmarshal
+		w.WriteHeader(statusCode)
 		w.Write(body)
 		return
 	}
 
 	// Check if there is an error key and return the original body if it exists
 	if errorVal, hasError := result["errors"]; hasError && errorVal != nil {
-		SendOperationOutcome(w, result, req)
+		SendOperationOutcome(w, result, statusCode)
 		return
 	}
 
@@ -201,6 +203,7 @@ func SendRead(w http.ResponseWriter, body []byte, req *http.Request) {
 
 	if resource == nil {
 		// Return original if we couldn't find the resource
+		w.WriteHeader(statusCode)
 		w.Write(body)
 		return
 	}
@@ -212,10 +215,12 @@ func SendRead(w http.ResponseWriter, body []byte, req *http.Request) {
 	resourceBody, err := json.Marshal(resource)
 	if err != nil {
 		// Return original if we can't marshal
+		w.WriteHeader(statusCode)
 		w.Write(body)
 		return
 	}
 
+	w.WriteHeader(statusCode)
 	w.Write(resourceBody)
 }
 

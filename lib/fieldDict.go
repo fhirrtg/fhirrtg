@@ -109,7 +109,7 @@ func introspect() error {
 		fmt.Println(query.String())
 	}
 
-	body, err := GqlRequest(query.String(), "", nil)
+	body, _, err := GqlRequest(query.String(), "", nil)
 	if err != nil {
 		return err
 	}

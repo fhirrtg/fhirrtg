@@ -66,13 +66,13 @@ func FhirCreate(w http.ResponseWriter, req *http.Request, resourceType string) {
 
 	fmt.Println(gqlStr)
 
-	resp, err := GqlRequest(gqlStr, profile, req)
+	body, statusCode, err := GqlRequest(gqlStr, profile, req)
 	if err != nil {
-		SendError(w, err.Error(), http.StatusInternalServerError)
+		SendError(w, err.Error(), statusCode)
 		return
 	}
 	// resource := ProcessCreate(resp, req)
-	w.Write(resp)
+	w.Write(body)
 	// w.Write(resp) --- IGNORE ---
 }
 
