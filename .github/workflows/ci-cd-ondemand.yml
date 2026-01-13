@@ -22,7 +22,7 @@ jobs:
     if: inputs.action == 'deploy'
     uses: telus-health-ch/chr-nonprod-deployment/.github/workflows/reusable-ci-wf-ondemand.yaml@main
     with:
-      source_repo: fhirrtg
+      source_repo: chr-fhirrtg
       dockerfile_path: ./Dockerfile
     secrets: inherit
 
