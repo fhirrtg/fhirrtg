@@ -243,6 +243,15 @@ func SendError(w http.ResponseWriter, msg string, code int) {
 func dispatch(w http.ResponseWriter, req *http.Request) {
 	ctxLog := LoggerFromRequest(req)
 
+	// Remove /fhir prefix if present
+	// TODO: Make this configurable
+	if strings.HasPrefix(req.URL.Path, "/fhir") {
+		req.URL.Path = strings.TrimPrefix(req.URL.Path, "/fhir")
+		if req.URL.Path == "" {
+			req.URL.Path = "/"
+		}
+	}
+
 	switch req.Method {
 	case http.MethodPost:
 		fmt.Println("Request Method: POST")
