@@ -243,6 +243,9 @@ func SendError(w http.ResponseWriter, msg string, code int) {
 func dispatch(w http.ResponseWriter, req *http.Request) {
 	ctxLog := LoggerFromRequest(req)
 
+	// Ignore Accept-encoding (gzip, deflate, br)
+	req.Header.Del("Accept-Encoding")
+
 	// Remove /fhir prefix if present
 	// TODO: Make this configurable
 	if strings.HasPrefix(req.URL.Path, "/fhir") {
