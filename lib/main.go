@@ -314,6 +314,7 @@ func dispatch(w http.ResponseWriter, req *http.Request) {
 
 	default:
 		ctxLog.Info("Request Method: Other")
+		ProxyRequest(w, req)
 	}
 }
 
