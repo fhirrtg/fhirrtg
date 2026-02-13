@@ -56,14 +56,15 @@ func (a ArgumentValue) String() string {
 
 // Field represents a GraphQL field (e.g., "id", "name")
 type Field struct {
-	Name       string
-	SubFields  []Field
-	Alias      string
-	Arguments  Arguments
-	Type       string
-	Kind       string
-	Connection bool
-	Fragments  []Fragment
+	Name           string
+	SubFields      []Field
+	Alias          string
+	Arguments      Arguments
+	Type           string
+	Kind           string
+	Connection     bool
+	Fragments      []Fragment
+	IsPossibleType bool
 }
 
 func (f Field) String() string {
@@ -79,7 +80,13 @@ func (f Field) regularString() string {
 		args = append(args, fmt.Sprintf("%s: %s", key, value.String()))
 	}
 
-	fieldStr := f.Name
+	fieldStr := ""
+	if f.IsPossibleType {
+		fieldStr += fmt.Sprintf("... on %s", f.Name)
+	} else {
+		fieldStr += f.Name
+	}
+
 	if f.Alias != "" {
 		fieldStr = f.Alias + ": " + fieldStr
 	}

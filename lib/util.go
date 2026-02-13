@@ -52,7 +52,7 @@ func GqlRequest(gql string, profile string, origReq *http.Request) (*http.Respon
 
 	query := fmt.Sprintf(`{"query": %q}`, gql)
 
-	url := fmt.Sprintf("%s/$graphql?_profile=%s", upstream, profile)
+	url := fmt.Sprintf("%s/$graphql?profile=%s", upstream, profile)
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte(query)))
 

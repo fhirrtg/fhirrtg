@@ -241,6 +241,19 @@ func buildFieldTree(fields []gql.Field, level int) []gql.Field {
 		if field.Kind == "SCALAR" || field.Kind == "ENUM" || field.Kind == "LIST" {
 			outFields = append(outFields, outField)
 		}
+		if field.Kind == "UNION" {
+			schema := schemaDict[field.Type]
+			for _, possibleType := range schema.PossibleTypes {
+				possibleSchema := schemaDict[possibleType.Name]
+				possibleField := gql.Field{
+					Name:           possibleType.Name,
+					IsPossibleType: true,
+					SubFields:      buildFieldTree(possibleSchema.Fields, level+1),
+				}
+				outField.SubFields = append(outField.SubFields, possibleField)
+			}
+			outFields = append(outFields, outField)
+		}
 	}
 	return outFields
 }

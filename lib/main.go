@@ -109,7 +109,7 @@ func init() {
 func fhirSearch(w http.ResponseWriter, req *http.Request, resourceType string) {
 	ctxLog := LoggerFromRequest(req)
 	queryString := req.URL.Query()
-	profile := queryString.Get("_profile")
+	profile := queryString.Get("profile")
 	fragment := GenerateFragment(resourceType)
 	fragments := map[string]gql.Fragment{resourceType: fragment}
 
