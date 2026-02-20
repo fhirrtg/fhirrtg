@@ -49,32 +49,6 @@ func generateCreateMutation(resourceType string, body []byte) (string, error) {
 	return gqlStr, nil
 }
 
-// func FhirCreate(w http.ResponseWriter, req *http.Request, resourceType string) {
-// 	body, err := io.ReadAll(req.Body)
-// 	if err != nil {
-// 		SendError(w, "Failed to read request body", http.StatusBadRequest)
-// 		return
-// 	}
-
-// 	profile := req.URL.Query().Get("_profile")
-// 	gqlStr, err := generateCreateMutation(resourceType, body)
-// 	if err != nil {
-// 		SendError(w, "Failed to generate GraphQL mutation", http.StatusInternalServerError)
-// 		return
-// 	}
-
-// 	resp, err := GqlRequest(gqlStr, profile, req)
-// 	if err != nil {
-// 		SendError(w, err.Error(), resp.StatusCode)
-// 		return
-// 	}
-// 	// resource := ProcessCreate(resp, req)
-// 	copyHeaders(w.Header(), resp.Header)
-// 	w.WriteHeader(resp.StatusCode)
-// 	w.Write(body)
-// 	// w.Write(resp) --- IGNORE ---
-// }
-
 func ProcessCreate(body []byte, req *http.Request) []byte {
 	var result map[string]interface{}
 	err := json.Unmarshal(body, &result)

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -141,7 +142,7 @@ func fhirCreate(w http.ResponseWriter, req *http.Request, resourceType string) {
 	gqlStr, err := generateCreateMutation(resourceType, body)
 	if err != nil {
 		ctxLog.Error("Failed to generate GraphQL mutation:", "error", err)
-		SendError(w, "Failed to generate GraphQL mutation", http.StatusInternalServerError)
+		SendError(w, fmt.Sprintf("Invalid input: %s", err.Error()), http.StatusBadRequest)
 		return
 	}
 
