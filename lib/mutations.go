@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"time"
@@ -33,7 +32,7 @@ func generateCreateMutation(resourceType string, body []byte) (string, error) {
 	primaryField := gql.Field{
 		Name: fmt.Sprintf("%sCreate", resourceType),
 		Arguments: gql.Arguments{
-			"resource": gql.ArgumentValue{Value: string(resourceBytes)},
+			"res": gql.ArgumentValue{Value: string(resourceBytes)},
 		},
 		Fragments: []gql.Fragment{returnFragment},
 		// SubFields: returnFragment.Fields,
@@ -50,29 +49,31 @@ func generateCreateMutation(resourceType string, body []byte) (string, error) {
 	return gqlStr, nil
 }
 
-func FhirCreate(w http.ResponseWriter, req *http.Request, resourceType string) {
-	body, err := io.ReadAll(req.Body)
-	if err != nil {
-		SendError(w, "Failed to read request body", http.StatusBadRequest)
-		return
-	}
+// func FhirCreate(w http.ResponseWriter, req *http.Request, resourceType string) {
+// 	body, err := io.ReadAll(req.Body)
+// 	if err != nil {
+// 		SendError(w, "Failed to read request body", http.StatusBadRequest)
+// 		return
+// 	}
 
-	profile := req.URL.Query().Get("_profile")
-	gqlStr, err := generateCreateMutation(resourceType, body)
-	if err != nil {
-		SendError(w, "Failed to generate GraphQL mutation", http.StatusInternalServerError)
-		return
-	}
+// 	profile := req.URL.Query().Get("_profile")
+// 	gqlStr, err := generateCreateMutation(resourceType, body)
+// 	if err != nil {
+// 		SendError(w, "Failed to generate GraphQL mutation", http.StatusInternalServerError)
+// 		return
+// 	}
 
-	resp, err := GqlRequest(gqlStr, profile, req)
-	if err != nil {
-		SendError(w, err.Error(), resp.StatusCode)
-		return
-	}
-	// resource := ProcessCreate(resp, req)
-	w.Write(body)
-	// w.Write(resp) --- IGNORE ---
-}
+// 	resp, err := GqlRequest(gqlStr, profile, req)
+// 	if err != nil {
+// 		SendError(w, err.Error(), resp.StatusCode)
+// 		return
+// 	}
+// 	// resource := ProcessCreate(resp, req)
+// 	copyHeaders(w.Header(), resp.Header)
+// 	w.WriteHeader(resp.StatusCode)
+// 	w.Write(body)
+// 	// w.Write(resp) --- IGNORE ---
+// }
 
 func ProcessCreate(body []byte, req *http.Request) []byte {
 	var result map[string]interface{}

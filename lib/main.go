@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"flag"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -14,8 +13,6 @@ import (
 	"strings"
 	"syscall"
 	"time"
-
-	"github.com/fhirrtg/fhirrtg/gql"
 )
 
 const (
@@ -106,131 +103,12 @@ func init() {
 	}
 }
 
-func fhirSearch(w http.ResponseWriter, req *http.Request, resourceType string) {
-	ctxLog := LoggerFromRequest(req)
-	queryString := req.URL.Query()
-	profile := queryString.Get("profile")
-	fragment := GenerateFragment(resourceType)
-	fragments := map[string]gql.Fragment{resourceType: fragment}
-
-	var includes []IncludeParam
-	includeParams := queryString["_include"]
-	for _, includeParam := range includeParams {
-		include, err := parseIncludeParam(includeParam)
-		if err != nil {
-			SendError(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		// Generate fragments for the possible types
-		for _, possibleType := range include.PossibleTypes {
-			fragments[possibleType] = GenerateFragment(possibleType)
-		}
-		includes = append(includes, include)
-	}
-
-	var revincludes []IncludeParam
-	revincludeParams := queryString["_revinclude"]
-	for _, revincludeParams := range revincludeParams {
-		revinclude, err := parseIncludeParam(revincludeParams)
-		if err != nil {
-			SendError(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		// Generate fragment for the revinclude type
-		fragments[revinclude.ResourceName] = GenerateFragment(revinclude.ResourceName)
-		revincludes = append(includes, revinclude)
-	}
-
-	var searchParams = make(gql.Arguments)
-	for key, value := range queryString {
-		if strings.HasPrefix(key, "_") && key != "_id" {
-			continue
-		}
-		searchParams[key] = gql.ArgumentValue{Value: value[0]}
-	}
-
-	gqlStr := ""
-	for _, fragment := range fragments {
-		gqlStr += fragment.String() + "\n"
-	}
-
-	query := FullResourceRequest(resourceType, searchParams, includes, revincludes, fragments)
-	gqlStr += query.String()
-
-	response, err := GqlRequest(gqlStr, profile, req)
-	if err != nil || response == nil {
-		SendError(w, err.Error(), http.StatusServiceUnavailable)
-		return
-	}
-
-	defer response.Body.Close()
-
-	body, err := io.ReadAll(response.Body)
-	if err != nil && body == nil {
-		ctxLog.Error("Error reading response body:", "error", err)
-		SendError(w, err.Error(), response.StatusCode)
-		return
-	}
-
-	copyHeaders(w.Header(), response.Header)
-	SendBundle(w, body, response.StatusCode, req)
-}
-
 func validateResource(resourceType string) error {
 	if _, exists := schemaDict[resourceType]; !exists {
 		return fmt.Errorf("unknown resource type: %s", resourceType)
 	}
 	log.Debug("validated resource type", "type", resourceType)
 	return nil
-}
-
-func fhirRead(w http.ResponseWriter, req *http.Request, resourceType string, id string) {
-	ctxLog := LoggerFromRequest(req)
-
-	queryString := req.URL.Query()
-	profile := queryString.Get("_profile")
-	fragment := GenerateFragment(resourceType)
-	fragments := map[string]gql.Fragment{resourceType: fragment}
-
-	query := gql.Query{
-		Operation: "query",
-		Name:      "Get" + resourceType,
-		Fields: []gql.Field{
-			{
-				Name: resourceType,
-				Arguments: gql.Arguments{
-					"id": gql.ArgumentValue{Value: id},
-				},
-				Fragments: []gql.Fragment{fragments[resourceType]},
-			},
-		},
-	}
-
-	gqlStr := ""
-	for _, fragment := range fragments {
-		gqlStr += fragment.String() + "\n"
-	}
-	gqlStr += query.String()
-
-	response, err := GqlRequest(gqlStr, profile, req)
-	if err != nil || response == nil {
-		SendError(w, err.Error(), http.StatusServiceUnavailable)
-		return
-	}
-
-	defer response.Body.Close()
-
-	body, err := io.ReadAll(response.Body)
-	if err != nil && body == nil {
-		ctxLog.Error("Error reading response body:", "error", err)
-		SendError(w, err.Error(), response.StatusCode)
-		return
-	}
-
-	copyHeaders(w.Header(), response.Header)
-	SendReadResult(w, body, response.StatusCode)
 }
 
 func SendError(w http.ResponseWriter, msg string, code int) {
@@ -263,11 +141,12 @@ func dispatch(w http.ResponseWriter, req *http.Request) {
 		switch len(pathComponents) {
 		case 1:
 			// Server Root
-			ctxLog.Info("No path components")
+			ProxyRequest(w, req)
+			return
 		case 2:
 			/// Create Resource
-			ctxLog.Info("Create Resource", "type", pathComponents[1])
-			FhirCreate(w, req, pathComponents[1])
+			fhirCreate(w, req, pathComponents[1])
+			return
 		case 3:
 			// Update Resource
 		default:
