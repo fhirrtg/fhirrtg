@@ -128,6 +128,44 @@ func fhirSearch(w http.ResponseWriter, req *http.Request, resourceType string) {
 	SendBundle(w, body, response.StatusCode, req)
 }
 
+func fhirUpdate(w http.ResponseWriter, req *http.Request, resourceType string, id string) {
+	ctxLog := LoggerFromRequest(req)
+
+	body, err := io.ReadAll(req.Body)
+	if err != nil {
+		ctxLog.Error("Failed to read request body:", "error", err)
+		SendError(w, "Failed to read request body", http.StatusBadRequest)
+		return
+	}
+
+	profile := req.URL.Query().Get("_profile")
+	gqlStr, err := generateUpdateMutation(resourceType, id, body)
+	if err != nil {
+		ctxLog.Error("Failed to generate GraphQL mutation:", "error", err)
+		SendError(w, fmt.Sprintf("Invalid input: %s", err.Error()), http.StatusBadRequest)
+		return
+	}
+
+	resp, err := GqlRequest(gqlStr, profile, req)
+	if err != nil {
+		ctxLog.Error("GraphQL request failed:", "error", err)
+		SendError(w, err.Error(), resp.StatusCode)
+		return
+	}
+	defer resp.Body.Close()
+
+	copyHeaders(w.Header(), resp.Header)
+
+	responseBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		ctxLog.Error("Failed to read response body:", "error", err)
+		SendError(w, "Failed to read response body", http.StatusInternalServerError)
+		return
+	}
+
+	SendReadResult(w, responseBody, resp.StatusCode)
+}
+
 func fhirCreate(w http.ResponseWriter, req *http.Request, resourceType string) {
 	ctxLog := LoggerFromRequest(req)
 

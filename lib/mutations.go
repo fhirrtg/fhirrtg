@@ -49,6 +49,47 @@ func generateCreateMutation(resourceType string, body []byte) (string, error) {
 	return gqlStr, nil
 }
 
+func generateUpdateMutation(resourceType string, id string, body []byte) (string, error) {
+	var resource map[string]interface{}
+	err := json.Unmarshal(body, &resource)
+	if err != nil {
+		slog.Error("Failed to unmarshal resource body", "error", err)
+		return "", err
+	}
+
+	if bodyID, ok := resource["id"].(string); ok && bodyID != "" && bodyID != id {
+		return "", fmt.Errorf("resource id %q in body does not match id %q in URL", bodyID, id)
+	}
+	resource["id"] = id
+
+	resourceBytes, err := json.Marshal(resource)
+	if err != nil {
+		slog.Error("Failed to marshal resource body", "error", err)
+		return "", err
+	}
+
+	returnFragment := GenerateFragment(resourceType)
+
+	primaryField := gql.Field{
+		Name: fmt.Sprintf("%sUpdate", resourceType),
+		Arguments: gql.Arguments{
+			"id":  gql.ArgumentValue{Value: id},
+			"res": gql.ArgumentValue{Value: string(resourceBytes)},
+		},
+		Fragments: []gql.Fragment{returnFragment},
+	}
+
+	gqlStr := returnFragment.String() + "\n"
+
+	mutation := gql.Query{
+		Operation: "mutation",
+		Name:      fmt.Sprintf("%sUpdateMutation", resourceType),
+		Fields:    []gql.Field{primaryField},
+	}
+	gqlStr += mutation.String()
+	return gqlStr, nil
+}
+
 func ProcessCreate(body []byte, req *http.Request) []byte {
 	var result map[string]interface{}
 	err := json.Unmarshal(body, &result)

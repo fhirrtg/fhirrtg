@@ -147,12 +147,23 @@ func dispatch(w http.ResponseWriter, req *http.Request) {
 			/// Create Resource
 			fhirCreate(w, req, pathComponents[1])
 			return
-		case 3:
-			// Update Resource
 		default:
 			ctxLog.Error("Bad Request")
 			SendError(w, "Bad Request", http.StatusBadRequest)
 		}
+
+	case http.MethodPut:
+		pathComponents := strings.Split(req.URL.Path, "/")
+		if len(pathComponents) != 3 {
+			ctxLog.Error("Bad Request")
+			SendError(w, "Bad Request", http.StatusBadRequest)
+			return
+		}
+		if err := validateResource(pathComponents[1]); err != nil {
+			ProxyRequest(w, req)
+			return
+		}
+		fhirUpdate(w, req, pathComponents[1], pathComponents[2])
 
 	case http.MethodGet:
 		if req.URL.Path == HEALTHCHECK_PATH {
@@ -218,9 +229,9 @@ func main() {
 	fmt.Println(`
 	    ________  __________     ____  ____________
 	   / ____/ / / /  _/ __ \   / __ \/_  __/ ____/
-	  / /_  / /_/ // // /_/ /  / /_/ / / / / / __  
-	 / __/ / __  // // _, _/  / _, _/ / / / /_/ /  
-	/_/   /_/ /_/___/_/ |_|  /_/ |_| /_/  \____/   
+	  / /_  / /_/ // // /_/ /  / /_/ / / / / / __
+	 / __/ / __  // // _, _/  / _, _/ / / / /_/ /
+	/_/   /_/ /_/___/_/ |_|  /_/ |_| /_/  \____/
 	`)
 	fmt.Printf("FHIR RTG server version %s\n", VERSION)
 	fmt.Printf("Connected to : %s\n", upstream)
