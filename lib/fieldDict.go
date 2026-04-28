@@ -41,11 +41,17 @@ type IntrospectionType struct {
 	Kind          string                      `json:"kind"`
 	PossibleTypes []IntrospectionPossibleType `json:"possibleTypes"`
 	Fields        []IntrospectionField        `json:"fields"`
+	InputFields   []IntrospectionField        `json:"inputFields"`
+	EnumValues    []IntrospectionEnumValue    `json:"enumValues"`
 }
 
 type IntrospectionField struct {
 	Name string                    `json:"name"`
 	Type IntrospectionFieldTypeDef `json:"type"`
+}
+
+type IntrospectionEnumValue struct {
+	Name string `json:"name"`
 }
 
 type IntrospectionFieldTypeDef struct {
@@ -97,6 +103,26 @@ func introspect() error {
 											ofTypeIntrospection(2, 1),
 										},
 									},
+								},
+							},
+							{
+								Name: "inputFields",
+								SubFields: []gql.Field{
+									{Name: "name"},
+									{
+										Name: "type",
+										SubFields: []gql.Field{
+											{Name: "name"},
+											{Name: "kind"},
+											ofTypeIntrospection(2, 1),
+										},
+									},
+								},
+							},
+							{
+								Name: "enumValues",
+								SubFields: []gql.Field{
+									{Name: "name"},
 								},
 							},
 						},
@@ -190,11 +216,26 @@ func buildFieldDict(response []byte) (map[string]gql.SchemaType, error) {
 				})
 			}
 		}
+		inputFields := []gql.Field{}
+		for _, field := range typ.InputFields {
+			fieldType, fieldKind := getFieldType(field.Type)
+			inputFields = append(inputFields, gql.Field{
+				Name: field.Name,
+				Type: fieldType,
+				Kind: fieldKind,
+			})
+		}
+		enumValues := []string{}
+		for _, ev := range typ.EnumValues {
+			enumValues = append(enumValues, ev.Name)
+		}
 		schemaDict[typ.Name] = gql.SchemaType{
 			Name:          typ.Name,
 			Kind:          typ.Kind,
 			PossibleTypes: convertPossibleTypes(typ.PossibleTypes),
 			Fields:        fields,
+			InputFields:   inputFields,
+			EnumValues:    enumValues,
 		}
 	}
 

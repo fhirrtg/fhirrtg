@@ -18,24 +18,16 @@ func generateCreateMutation(resourceType string, body []byte) (string, error) {
 		return "", err
 	}
 
-	// Remove id if it exists
 	delete(resource, "id")
-
-	resourceBytes, err := json.Marshal(resource)
-	if err != nil {
-		slog.Error("Failed to marshal resource body", "error", err)
-		return "", err
-	}
 
 	returnFragment := GenerateFragment(resourceType)
 
 	primaryField := gql.Field{
 		Name: fmt.Sprintf("%sCreate", resourceType),
 		Arguments: gql.Arguments{
-			"res": gql.ArgumentValue{Value: string(resourceBytes)},
+			"res": gql.ArgumentValue{Value: toGraphQLInput(resource, resourceType+"Input"), Raw: true},
 		},
 		Fragments: []gql.Fragment{returnFragment},
-		// SubFields: returnFragment.Fields,
 	}
 
 	gqlStr := returnFragment.String() + "\n"
@@ -60,13 +52,7 @@ func generateUpdateMutation(resourceType string, id string, body []byte) (string
 	if bodyID, ok := resource["id"].(string); ok && bodyID != "" && bodyID != id {
 		return "", fmt.Errorf("resource id %q in body does not match id %q in URL", bodyID, id)
 	}
-	resource["id"] = id
-
-	resourceBytes, err := json.Marshal(resource)
-	if err != nil {
-		slog.Error("Failed to marshal resource body", "error", err)
-		return "", err
-	}
+	delete(resource, "id")
 
 	returnFragment := GenerateFragment(resourceType)
 
@@ -74,7 +60,7 @@ func generateUpdateMutation(resourceType string, id string, body []byte) (string
 		Name: fmt.Sprintf("%sUpdate", resourceType),
 		Arguments: gql.Arguments{
 			"id":  gql.ArgumentValue{Value: id},
-			"res": gql.ArgumentValue{Value: string(resourceBytes)},
+			"res": gql.ArgumentValue{Value: toGraphQLInput(resource, resourceType+"Input"), Raw: true},
 		},
 		Fragments: []gql.Fragment{returnFragment},
 	}

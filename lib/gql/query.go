@@ -36,11 +36,15 @@ func (v Variable) String() string {
 
 type ArgumentValue struct {
 	Value        string
+	Raw          bool
 	SubArguments map[string]ArgumentValue
 }
 type Arguments map[string]ArgumentValue
 
 func (a ArgumentValue) String() string {
+	if a.Raw {
+		return a.Value
+	}
 	if len(a.SubArguments) > 0 {
 		var subArgs []string
 		for key, value := range a.SubArguments {
@@ -176,6 +180,8 @@ type SchemaType struct {
 	Kind          string
 	PossibleTypes []PossibleType
 	Fields        []Field
+	InputFields   []Field
+	EnumValues    []string
 }
 
 // func Test() {
