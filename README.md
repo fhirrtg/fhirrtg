@@ -56,6 +56,7 @@ Configuration is done via environment variables:
 | `RTG_SKIP_TLS_VERIFY` | Skip upstream certificate verification | `false` |
 | `RTG_GRAPHQL_TIMEOUT` | Timeout for GraphQL requests (in seconds) | `30` |
 | `RTG_GQL_ACCEPT_HEADER` | HTTP Accept header for upstream server | `application/graphql-response+json;charset=utf-8, application/json;charset=utf-8` |
+| `RTG_PRESERVE_HOST` | Set every upstream request's `Host` to the incoming request's domain instead of the upstream server's | `true` |
 
 Example:
 

@@ -64,6 +64,9 @@ func GqlRequest(gql string, profile string, origReq *http.Request) (*http.Respon
 	if origReq != nil {
 		copyHeaders(req.Header, origReq.Header)
 		addForwardedFor(req)
+		if preserveHost {
+			req.Host = origReq.Host
+		}
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -92,6 +95,9 @@ func ProxyRequest(w http.ResponseWriter, origReq *http.Request) {
 		ctxLog.Info("Proxying request")
 		copyHeaders(proxyReq.Header, origReq.Header)
 		addForwardedFor(proxyReq)
+		if preserveHost {
+			proxyReq.Host = origReq.Host
+		}
 	}
 
 	resp, err := client.Do(proxyReq)

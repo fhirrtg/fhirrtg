@@ -30,9 +30,10 @@ var (
 )
 
 var (
-	client   *http.Client
-	log      *slog.Logger
-	upstream string
+	client       *http.Client
+	log          *slog.Logger
+	upstream     string
+	preserveHost bool
 )
 
 func init() {
@@ -83,6 +84,10 @@ func init() {
 
 	GQL_ACCEPT_HEADER = getEnv("RTG_GQL_ACCEPT_HEADER", DEFAULT_GQL_ACCEPT_HEADER)
 	HEALTHCHECK_PATH = getEnv("RTG_HEALTHCHECK_PATH", HEALTHCHECK_PATH)
+
+	// When enabled, every upstream request uses the incoming request's
+	// domain as its Host header instead of the upstream server's domain.
+	preserveHost = getEnv("RTG_PRESERVE_HOST", "true") == "true"
 
 	// HTTP Client Setup
 	skipTlsVerify := getEnv("RTG_SKIP_TLS_VERIFY", "false") == "true"
